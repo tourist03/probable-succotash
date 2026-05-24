@@ -1,0 +1,49 @@
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Local tool state and generated analysis
+.claude/
+.codex/
+graphify-out/
+
+# Python environments and caches
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# JavaScript dependencies and build output
+news-ui/node_modules/
+news-ui/dist/
+news-ui/.vite/
+
+# Secrets and local environment configuration
+.env
+.env.*
+!.env.example
+
+# Downloaded or trained models
+flan-t5-local/
+local_bart_model/
+local_miniLM_model/
+semantic_model/
+bouncer_model.pkl
+
+# Runtime state, collected data, and user activity exports
+history_archive/
+dropped_articles.json
+not_interested_store.json
+seen_registry.json
+usage_tracker.json
+workflow_store.json
+manual_search_logs.xlsx
+trainingData.json
+training_dataset.csv
+
+# Local archives and extracted working copies
+*.zip
+NewProject_extracted/
+sense_codebase_extracted/
