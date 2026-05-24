@@ -16,7 +16,7 @@ function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore,
         : 'Discovered Signal';
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="dossier-tile dossier-workflow rounded-2xl border border-white/10 bg-white/[0.04] p-4">
       <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Workflow</div>
       <div className="mt-2 text-base font-semibold text-white">{state}</div>
       {item.selected_by && <div className="mt-1 text-sm text-slate-400">Selected by {item.selected_by}</div>}
@@ -57,7 +57,7 @@ function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore,
           </button>
         )}
         {!approved && !hidden && onVote && (
-          <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+          <div className="dossier-feedback rounded-xl border border-white/10 bg-white/[0.035] p-3">
             <span className="mb-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Relevance Feedback</span>
             <Bouncer onVote={(value) => onVote(item, value)} />
           </div>
@@ -108,7 +108,7 @@ function RegionCorrection({ item, onCorrectRegion }) {
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="dossier-tile dossier-region rounded-2xl border border-white/10 bg-white/[0.04] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Region</div>
@@ -190,7 +190,7 @@ export default function ArticleModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal dossier" onClick={(e) => e.stopPropagation()}>
-        <div className="head">
+        <div className="head dossier-head">
           <div>
             <h3>Intelligence Dossier</h3>
             <div className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -200,33 +200,33 @@ export default function ArticleModal({
           <span className="x" onClick={onClose}><Icon name="x" /></span>
         </div>
 
-        <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="overflow-y-auto p-5 sm:p-6">
-            <SignalVisual item={item} className="h-72 rounded-[24px]" />
+        <div className="dossier-layout grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="dossier-reading overflow-y-auto p-5 sm:p-6">
+            <SignalVisual item={item} className="dossier-hero h-72 rounded-[24px]" />
             <div className="mt-6 flex flex-wrap gap-2">
               <span className="signal-chip">{item.category || 'News'}</span>
               <span className="signal-chip">{item.region || 'Global'}</span>
               <span className="signal-chip">Score {score}</span>
               <span className="signal-chip">{item.source_count || sources.length || 1} sources</span>
             </div>
-            <h2 className="mt-5 text-3xl font-semibold leading-tight text-white sm:text-4xl">{item.title}</h2>
+            <h2 className="dossier-title mt-5 text-3xl font-semibold leading-tight text-white sm:text-4xl">{item.title}</h2>
             <div className="mt-3 text-sm text-slate-500">
               {[item.date, item.time, item.src].filter(Boolean).join(' · ')}
             </div>
 
-            <section className="mt-8">
+            <section className="dossier-section mt-8">
               <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">AI Summary</h4>
               <p className="mt-3 text-base leading-8 text-slate-300">{item.summary || 'No summary available.'}</p>
             </section>
 
-            <section className="mt-8">
+            <section className="dossier-section mt-8">
               <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Why This Matters</h4>
               <p className="mt-3 text-base leading-8 text-slate-300">
                 {item.why_matters || `This signal is ranked at ${score}/100 from ${item.source_count || sources.length || 1} source${(item.source_count || sources.length || 1) === 1 ? '' : 's'}, with category and regional context for briefing review.`}
               </p>
             </section>
 
-            <section className="mt-8">
+            <section className="dossier-section dossier-sources mt-8">
               <div className="flex items-center justify-between gap-4">
                 <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Source Coverage</h4>
                 <span className="text-sm text-slate-500">Clustered from {item.source_count || sources.length || 1} sources</span>
@@ -236,7 +236,7 @@ export default function ArticleModal({
                   const name = source.name || source.source || item.src || `Source ${idx + 1}`;
                   const url = source.url || source.link || item.url;
                   return (
-                    <div key={`${name}-${idx}`} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                    <div key={`${name}-${idx}`} className="source-coverage-card rounded-2xl border border-white/10 bg-white/[0.035] p-4">
                       <div className="font-semibold text-slate-100">{name}</div>
                       <div className="mt-1 text-sm text-slate-400">{source.title || item.title}</div>
                       <div className="mt-1 text-xs text-slate-500">{source.published || source.date || item.date}</div>
@@ -248,7 +248,7 @@ export default function ArticleModal({
                     </div>
                   );
                 }) : (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm text-slate-400">No source metadata available.</div>
+                  <div className="source-coverage-card rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm text-slate-400">No source metadata available.</div>
                 )}
               </div>
               {sources.length > 5 && (
@@ -259,9 +259,9 @@ export default function ArticleModal({
             </section>
           </div>
 
-          <aside className="overflow-y-auto border-t border-white/10 bg-[#0b1220]/80 p-5 lg:border-l lg:border-t-0">
+          <aside className="dossier-rail overflow-y-auto border-t border-white/10 bg-[#0b1220]/80 p-5 lg:border-l lg:border-t-0">
             <div className="sticky top-4 space-y-4">
-              <div className="rounded-2xl border border-sky-300/15 bg-sky-400/[0.06] p-4">
+              <div className="dossier-strength rounded-2xl border border-sky-300/15 bg-sky-400/[0.06] p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-200">Signal Strength</div>
                 <div className="mt-3 text-4xl font-semibold text-white">{score}<span className="text-lg text-slate-500"> / 100</span></div>
                 <div className="mt-1 text-sm text-slate-400">{score >= 80 ? 'High Signal' : score >= 58 ? 'Normal Intelligence' : 'Compact Signal'}</div>
@@ -271,11 +271,11 @@ export default function ArticleModal({
                 <div className="signal-stat"><span>Region</span><strong>{item.region || 'Global'}</strong></div>
               </div>
               <RegionCorrection item={item} onCorrectRegion={onCorrectRegion} />
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="dossier-tile rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
                 <div className="mt-2 font-semibold text-white">{item.category || 'News'}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="dossier-tile rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Keywords</div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(item.keywords || []).length

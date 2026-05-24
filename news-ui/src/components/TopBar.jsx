@@ -59,7 +59,7 @@ export default function TopBar({ manualScan }) {
   const isBroadcast = profile === 'broadcast';
 
   return (
-    <header className="design-header fixed left-0 top-0 z-40 w-[1920px] border-b border-white/10 bg-[#0b1322]/90 backdrop-blur-xl">
+    <header className={`design-header ${isBroadcast ? 'is-broadcast' : 'is-default'} fixed left-0 top-0 z-40 w-[1920px] border-b border-white/10 bg-[#0b1322]/90 backdrop-blur-xl`}>
       <div className="command-header-inner flex h-[82px] items-center gap-8 px-12">
         <div className="brand-status group relative min-w-[320px]">
           <button
@@ -83,7 +83,7 @@ export default function TopBar({ manualScan }) {
                 NewsScrapper Intelligence
               </span>
               <span className="flex items-center gap-2 text-[11px] uppercase tracking-[0.26em] text-slate-400">
-                Executive Signal Intelligence
+                Sense.AI / Intelligence Briefing
                 {schedulerActive && <span className="scheduler-live-dot" aria-hidden="true" />}
               </span>
             </span>
@@ -137,7 +137,7 @@ export default function TopBar({ manualScan }) {
           </span>
           <div className="relative">
             <button
-              className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-sky-300/30 hover:text-white"
+              className="command-settings-trigger flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-sky-300/30 hover:text-white"
               onClick={() => setOpen((v) => !v)}
               title="Settings"
               type="button"
@@ -145,11 +145,11 @@ export default function TopBar({ manualScan }) {
               <Icon name="settings" />
             </button>
             {open && (
-              <div className="absolute right-0 mt-4 w-72 overflow-hidden rounded-2xl border border-white/10 bg-[#101827] p-3 shadow-cockpit">
+              <div className="command-settings-menu absolute right-0 mt-4 w-72 overflow-hidden rounded-2xl border border-white/10 bg-[#101827] p-3 shadow-cockpit">
                 {settingsNav.map((item) => (
                   <button
                     key={item.to}
-                    className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm text-slate-300 transition hover:bg-white/[0.07] hover:text-white"
+                    className="command-settings-item flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm text-slate-300 transition hover:bg-white/[0.07] hover:text-white"
                     onClick={() => {
                       setOpen(false);
                       navigate(item.to);

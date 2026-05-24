@@ -40,7 +40,7 @@ export default function DraftExportModal({ items, open, onClose, source = 'brief
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <section className="modal sm export-modal" onClick={(event) => event.stopPropagation()}>
+      <section className="modal sm compact-dialog export-modal" onClick={(event) => event.stopPropagation()}>
         <div className="head">
           <div>
             <h3>Draft Export</h3>

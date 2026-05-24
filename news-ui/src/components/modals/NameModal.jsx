@@ -35,7 +35,7 @@ export default function NameModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal sm" onClick={(e) => e.stopPropagation()}>
+      <div className="modal sm compact-dialog selection-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="head">
           <Icon name="check" />
           <h3>{title}</h3>

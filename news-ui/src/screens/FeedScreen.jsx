@@ -108,7 +108,7 @@ function TopClusterCarousel({ articles, onOpen, onSelect }) {
 
   return (
     <section
-      className="cockpit-top-card group relative overflow-hidden rounded-[22px] border border-sky-300/20 bg-[#101827] shadow-glow"
+      className="hero-cluster-panel cockpit-top-card group relative overflow-hidden rounded-[22px] border border-sky-300/20 bg-[#101827] shadow-glow"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -217,7 +217,7 @@ function BriefingStream({ articles, onOpen, navigate }) {
   const stream = sortByDate(articles).slice(0, 10);
 
   return (
-    <aside className="cockpit-top-card flex flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#101827]/90 p-4 shadow-cockpit 2xl:p-5">
+    <aside className="briefing-stream-panel cockpit-top-card flex flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#101827]/90 p-4 shadow-cockpit 2xl:p-5">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">
         <Icon name="archive" size={14} /> Briefing Stream
       </div>
@@ -318,7 +318,7 @@ function SearchLoadedBriefing({ filters, setFilters, options, count, total }) {
   const reset = () => setFilters(emptyFilters);
 
   return (
-    <section className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-5 shadow-cockpit">
+    <section className="loaded-briefing-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5 shadow-cockpit">
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Search Loaded Briefing</div>
@@ -620,7 +620,7 @@ export default function FeedScreen() {
   }
 
   return (
-    <div className="space-y-4 2xl:space-y-5">
+    <div className="briefing-home space-y-4 2xl:space-y-5">
       <section className="briefing-stage grid gap-4 2xl:gap-5">
         <div className="briefing-top-row grid min-h-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(230px,1fr)_minmax(230px,1fr)] 2xl:gap-5">
           <TopClusterCarousel
@@ -678,7 +678,7 @@ export default function FeedScreen() {
       </section>
 
       <button
-        className="inline-flex w-full max-w-xl items-center justify-between gap-4 rounded-[20px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-sky-300/25 hover:bg-white/[0.055] sm:w-auto sm:min-w-[420px]"
+        className="hidden-review-link inline-flex w-full max-w-xl items-center justify-between gap-4 rounded-[20px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-sky-300/25 hover:bg-white/[0.055] sm:w-auto sm:min-w-[420px]"
         onClick={() => navigate('/rejected')}
         type="button"
       >
@@ -720,7 +720,7 @@ export default function FeedScreen() {
       />
       {selectedBatch.length > 0 && (
         <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
-          <div className="flex flex-wrap items-center justify-center gap-3 rounded-full border border-sky-300/20 bg-[#101827]/95 px-5 py-3 text-sm text-slate-200 shadow-cockpit backdrop-blur-xl">
+          <div className="batch-action-bar flex flex-wrap items-center justify-center gap-3 rounded-full border border-sky-300/20 bg-[#101827]/95 px-5 py-3 text-sm text-slate-200 shadow-cockpit backdrop-blur-xl">
             <strong>{selectedBatch.length} selected</strong>
             <button className="btn-dark-secondary h-9" onClick={() => setChecked({})} type="button">Clear</button>
             <button className="btn-dark-primary h-9" onClick={() => setBatchSelect({ title: `${selectedBatch.length} selected signals` })} type="button">

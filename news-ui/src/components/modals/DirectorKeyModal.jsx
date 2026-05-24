@@ -25,7 +25,7 @@ export default function DirectorKeyModal({ open, onClose, onConfirm, article }) 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal sm" onClick={(e) => e.stopPropagation()}>
+      <div className="modal sm compact-dialog approval-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="head">
           <Icon name="shield" />
           <h3>Approval Required</h3>

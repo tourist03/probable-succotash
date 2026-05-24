@@ -19,6 +19,21 @@ import HistoryScreen from './screens/HistoryScreen.jsx';
 import TrendsScreen from './screens/TrendsScreen.jsx';
 import VocScreen from './screens/VocScreen.jsx';
 
+const SENSE_ATMOSPHERE_VIDEO = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4';
+
+function ProductAtmosphere({ live }) {
+  return (
+    <div className={live ? 'product-atmosphere is-live' : 'product-atmosphere'} aria-hidden="true">
+      {live && (
+        <video className="product-atmosphere-video" muted playsInline autoPlay loop>
+          <source src={SENSE_ATMOSPHERE_VIDEO} type="video/mp4" />
+        </video>
+      )}
+      <div className="product-atmosphere-material" />
+    </div>
+  );
+}
+
 export default function App() {
   const { pathname } = useLocation();
   useTracking(pathname);
@@ -143,6 +158,7 @@ export default function App() {
   return (
     <DesignViewport>
       <div className="app-shell min-h-[1080px] text-slate-100">
+        <ProductAtmosphere live={pathname === '/home'} />
         <TopBar manualScan={manualScan} />
         <main className="design-main mx-auto w-full px-12 pb-20 pt-[112px]">
           <Routes>

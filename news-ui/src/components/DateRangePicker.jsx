@@ -102,7 +102,7 @@ export default function DateRangePicker({
       <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</span>
       <button
         ref={triggerRef}
-        className="dark-input flex items-center justify-between gap-3 text-left"
+        className="date-range-trigger dark-input flex items-center justify-between gap-3 text-left"
         onClick={syncOpen}
         type="button"
       >
@@ -125,7 +125,7 @@ export default function DateRangePicker({
             aria-modal="true"
             aria-label="Select date range"
           >
-          <div className="flex items-center justify-between border-b border-white/10 p-4">
+          <div className="date-range-head flex items-center justify-between border-b border-white/10 p-4">
             <button className="carousel-control h-9 w-9" onClick={() => setMonth(addMonths(month, -1))} type="button" aria-label="Previous month">
               <Icon name="chevL" size={15} />
             </button>
@@ -136,14 +136,14 @@ export default function DateRangePicker({
           </div>
 
           {shortcuts && (
-            <div className="flex flex-wrap gap-2 border-b border-white/10 p-3">
+            <div className="date-range-shortcuts flex flex-wrap gap-2 border-b border-white/10 p-3">
               <button className="source-chip" onClick={() => applyShortcut('today')} type="button">Today</button>
               <button className="source-chip" onClick={() => applyShortcut('24h')} type="button">Last 24 Hours</button>
               <button className="source-chip" onClick={() => applyShortcut('7d')} type="button">Last 7 Days</button>
             </div>
           )}
 
-          <div className="p-4">
+          <div className="date-range-calendar p-4">
             <div className="mb-2 grid grid-cols-7 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => <div key={`${day}-${index}`}>{day}</div>)}
             </div>
@@ -157,9 +157,10 @@ export default function DateRangePicker({
                   <button
                     key={iso}
                     className={[
-                      'h-10 rounded-xl text-sm font-semibold transition',
+                      'date-range-day h-10 rounded-xl text-sm font-semibold transition',
+                      selected ? 'selected' : ranged ? 'in-range' : '',
                       selected ? 'bg-sky-400 text-white shadow-glow' : ranged ? 'bg-sky-400/12 text-sky-100' : 'bg-white/[0.035] text-slate-300 hover:bg-white/[0.07]',
-                      muted ? 'opacity-35' : '',
+                      muted ? 'muted opacity-35' : '',
                     ].join(' ')}
                     onClick={() => pickDay(iso)}
                     type="button"
@@ -171,7 +172,7 @@ export default function DateRangePicker({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-white/10 p-4">
+          <div className="date-range-foot flex items-center justify-between gap-3 border-t border-white/10 p-4">
             <div className="text-xs text-slate-500">{draftFrom || 'Start'} → {draftTo || 'End'}</div>
             <div className="flex gap-2">
               <button className="btn-dark-secondary h-9" onClick={() => setOpen(false)} type="button">Cancel</button>

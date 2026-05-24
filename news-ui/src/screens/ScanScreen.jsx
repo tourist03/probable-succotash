@@ -77,7 +77,7 @@ function SourcePicker({ sites, selected, onApply }) {
   return (
     <div className="relative">
       <button
-        className="dark-input flex items-center justify-between gap-3 text-left"
+        className="source-picker-trigger dark-input flex items-center justify-between gap-3 text-left"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
@@ -102,13 +102,13 @@ function SourcePicker({ sites, selected, onApply }) {
             aria-modal="true"
             aria-label="Source Picker"
           >
-          <div className="shrink-0 flex items-center justify-between gap-3 border-b border-white/10 p-4">
+          <div className="source-picker-head shrink-0 flex items-center justify-between gap-3 border-b border-white/10 p-4">
             <div>
               <div className="text-sm font-semibold text-white">Source Picker</div>
               <div className="mt-1 text-xs text-slate-500">Grouped by sites.json category</div>
             </div>
             <button
-              className="text-sm font-semibold text-sky-200 hover:text-white"
+              className="source-picker-manage text-sm font-semibold text-sky-200 hover:text-white"
               onClick={() => navigate('/sources')}
               type="button"
             >
@@ -116,7 +116,7 @@ function SourcePicker({ sites, selected, onApply }) {
             </button>
           </div>
 
-          <div className="shrink-0 space-y-3 p-4">
+          <div className="source-picker-tools shrink-0 space-y-3 p-4">
             <input
               className="dark-input"
               value={query}
@@ -135,7 +135,7 @@ function SourcePicker({ sites, selected, onApply }) {
               const selectedInGroup = names.filter((name) => draftSet.has(name)).length;
               const allSelected = names.length > 0 && selectedInGroup === names.length;
               return (
-                <div key={category} className="rounded-2xl border border-white/10 bg-white/[0.035] p-3">
+                <div key={category} className="source-category-card rounded-2xl border border-white/10 bg-white/[0.035] p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <button
                       className="text-left text-sm font-semibold text-slate-100 hover:text-white"
@@ -156,7 +156,7 @@ function SourcePicker({ sites, selected, onApply }) {
                     {group.map((source) => {
                       const name = sourceName(source);
                       return (
-                        <label key={name} className="flex cursor-pointer items-start gap-3 rounded-xl px-2 py-2 hover:bg-white/[0.045]">
+                        <label key={name} className="source-option flex cursor-pointer items-start gap-3 rounded-xl px-2 py-2 hover:bg-white/[0.045]">
                           <input
                             type="checkbox"
                             className="signal-checkbox mt-0.5"
@@ -181,7 +181,7 @@ function SourcePicker({ sites, selected, onApply }) {
             )}
           </div>
 
-          <div className="shrink-0 flex items-center justify-between gap-3 border-t border-white/10 p-4">
+          <div className="source-picker-foot shrink-0 flex items-center justify-between gap-3 border-t border-white/10 p-4">
             <div className="text-sm text-slate-500">
               {draft.length ? `${draft.length} manually selected` : 'All active sources will be used'}
             </div>
@@ -395,13 +395,23 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
             <Icon name="search" size={15} />
             <span>Investigation query</span>
           </div>
-          <input
-            className="scan-query-input"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') start(); }}
-            placeholder="Enter target keywords, company, industry, or event..."
-          />
+          <div className="scan-query-primary">
+            <label className="scan-query-capsule">
+              <Icon name="search" size={20} />
+              <input
+                className="scan-query-input"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') start(); }}
+                placeholder="Search a company, industry, technology, or event..."
+              />
+            </label>
+            {running ? (
+              <button className="scan-run scan-run-primary stop" onClick={stop} type="button"><Icon name="stop" /> Stop Scan</button>
+            ) : (
+              <button className="scan-run scan-run-primary" onClick={start} type="button"><Icon name="search" /> Run Deep Search</button>
+            )}
+          </div>
           <div className="scan-command-controls">
             <DateRangePicker
               from={from}
@@ -415,11 +425,10 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sources</span>
               <SourcePicker sites={sites} selected={pickedSites} onApply={setPicked} />
             </div>
-            {running ? (
-              <button className="scan-run stop" onClick={stop} type="button"><Icon name="stop" /> Stop Scan</button>
-            ) : (
-              <button className="scan-run" onClick={start} type="button"><Icon name="play" /> Run Deep Search</button>
-            )}
+            <div className="scan-scope-note" aria-label="Manual search session behavior">
+              <span>Session Workspace</span>
+              <p>Results remain available while you navigate this session.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -511,7 +520,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
 
       {hiddenCount > 0 && (
         <button
-          className="scan-hidden-signals inline-flex w-full max-w-xl items-center justify-between gap-4 rounded-[20px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-sky-300/25 hover:bg-white/[0.055] sm:w-auto sm:min-w-[420px]"
+          className="hidden-review-link scan-hidden-signals inline-flex w-full max-w-xl items-center justify-between gap-4 rounded-[20px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-sky-300/25 hover:bg-white/[0.055] sm:w-auto sm:min-w-[420px]"
           onClick={() => navigate('/rejected')}
           type="button"
         >
@@ -552,7 +561,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
 
       {selectedBatch.length > 0 && (
         <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
-          <div className="flex flex-wrap items-center justify-center gap-3 rounded-full border border-sky-300/20 bg-[#101827]/95 px-5 py-3 text-sm text-slate-200 shadow-cockpit backdrop-blur-xl">
+          <div className="batch-action-bar flex flex-wrap items-center justify-center gap-3 rounded-full border border-sky-300/20 bg-[#101827]/95 px-5 py-3 text-sm text-slate-200 shadow-cockpit backdrop-blur-xl">
             <strong>{selectedBatch.length} selected</strong>
             <button className="btn-dark-secondary h-9" onClick={() => setChecked({})} type="button">Clear</button>
             <button className="btn-dark-primary h-9" onClick={() => setBatchSelect({ title: `${selectedBatch.length} selected signals` })} type="button">Send to Review Queue</button>
