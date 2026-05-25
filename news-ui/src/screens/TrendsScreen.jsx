@@ -38,7 +38,7 @@ export default function TrendsScreen() {
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Profile Settings</div>
           <h1 className="mt-2 text-3xl font-semibold text-white sm:text-5xl">Intelligence profile</h1>
-          <p className="mt-3 text-slate-400">Choose the working profile and default reviewer identity used across selection flows.</p>
+          <p className="mt-3 text-slate-400">Choose the backend intelligence stream and default reviewer identity used across selection flows.</p>
         </div>
       </section>
 
@@ -96,7 +96,7 @@ export default function TrendsScreen() {
             <span className="source-chip">9 sources</span>
           </div>
           <div className="mt-4 text-2xl font-semibold text-white">Executive intelligence cockpit profile is active.</div>
-          <p className="mt-2 text-sm text-slate-400">Accent choice is stored locally and reflected in the header profile tag.</p>
+          <p className="mt-2 text-sm text-slate-400">Your active stream now controls sources, history, feedback training, and new searches.</p>
         </div>
       </section>
     </div>

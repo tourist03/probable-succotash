@@ -3193,6 +3193,10 @@ h4 {
   z-index: 1;
 }
 
+.design-main:has(.modal-overlay) {
+  z-index: 80;
+}
+
 .design-header {
   background: linear-gradient(180deg, rgba(5, 1, 14, 0.86), rgba(5, 1, 14, 0)) !important;
 }
@@ -4028,4 +4032,82 @@ h4 {
     width: calc(100% - 32px);
     height: calc(100% - 32px);
   }
+}
+
+/* Quiet command bar: independent controls instead of a reserved header block. */
+.design-header {
+  pointer-events: none;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.command-header-inner {
+  margin: 16px 34px 0;
+  padding: 0 !important;
+  border: 0;
+  background: transparent !important;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.header-brand,
+.command-nav,
+.header-actions,
+.manual-scan-live {
+  pointer-events: auto;
+}
+
+.header-brand {
+  min-width: 292px;
+  padding: 8px 14px 8px 9px;
+  border: 1px solid rgba(205, 193, 255, 0.12);
+  border-radius: 21px;
+  background: rgba(9, 6, 25, 0.42);
+  box-shadow: 0 16px 46px rgba(2, 0, 14, 0.24);
+  backdrop-filter: blur(20px);
+}
+
+.header-actions {
+  padding: 5px;
+  border: 1px solid rgba(205, 193, 255, 0.11);
+  border-radius: 17px;
+  background: rgba(9, 6, 25, 0.38);
+  backdrop-filter: blur(20px);
+}
+
+.sense-lens-mark {
+  position: relative;
+  display: block;
+  width: 27px;
+  height: 27px;
+}
+
+.sense-lens-ring {
+  position: absolute;
+  inset: 1px;
+  border: 2px solid #d9d5ff;
+  border-radius: 50%;
+  box-shadow: 0 0 16px rgba(133, 119, 255, 0.5);
+}
+
+.sense-lens-core {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #62e7d5, #8787ff 60%, #e483bd);
+}
+
+.sense-lens-ray {
+  position: absolute;
+  right: -2px;
+  bottom: 2px;
+  width: 10px;
+  height: 2px;
+  border-radius: 4px;
+  background: #d9d5ff;
+  transform: rotate(46deg);
+  transform-origin: center;
 }

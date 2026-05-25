@@ -4,8 +4,10 @@ sys.stdout.reconfigure(encoding='utf-8')
 import json
 import os
 import re
+import threading
 from datetime import datetime
 from collections import Counter
+from pathlib import Path
 import numpy as np
 
 try:
@@ -29,25 +31,65 @@ try:
 except ImportError:
     BART_AVAILABLE = False
 
+BASE_DIR = Path(__file__).resolve().parent
+SEMANTIC_MODEL_DIR = BASE_DIR / "semantic_model"
+FALLBACK_MINILM_DIR = BASE_DIR / "local_miniLM_model"
+BART_MODEL_DIR = BASE_DIR / "local_bart_model"
+SEEN_REGISTRY_FILE = BASE_DIR / "seen_registry.json"
+DEFAULT_CLUSTER_DISTANCE_THRESHOLD = 0.32
+MAX_CLUSTER_TEXT_CHARS = 2200
+SEEN_REGISTRY_LOCK = threading.Lock()
+SUMMARY_MODEL_LOCK = threading.Lock()
+SUMMARY_INFERENCE_LOCK = threading.Lock()
+SHARED_BART_TOKENIZER = None
+SHARED_BART_MODEL = None
+
+
+def load_seen_registry():
+    with SEEN_REGISTRY_LOCK:
+        if not SEEN_REGISTRY_FILE.exists():
+            return {}
+        try:
+            with open(SEEN_REGISTRY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+
+def merge_seen_registry(seen_registry):
+    with SEEN_REGISTRY_LOCK:
+        current = {}
+        if SEEN_REGISTRY_FILE.exists():
+            try:
+                with open(SEEN_REGISTRY_FILE, "r", encoding="utf-8") as f:
+                    current = json.load(f)
+            except Exception:
+                current = {}
+        current.update(seen_registry)
+        with open(SEEN_REGISTRY_FILE, "w", encoding="utf-8") as f:
+            json.dump(current, f, indent=4)
+
 
 class MinimalSemanticEngine:
-    def __init__(self):
+    def __init__(self, load_summarizer=False):
         self.semantic_model = None
         self.sentiment_analyzer = None
         self.bart_model = None
         self.bart_tokenizer = None
-        self.load_models()
+        self.load_models(load_summarizer=load_summarizer)
 
-    def load_models(self):
+    def load_models(self, load_summarizer=False):
         if CLUSTERING_AVAILABLE:
             try:
                 print("FUSION ENGINE: Loading Semantic Model...", flush=True)
-                model_path = os.path.join(os.getcwd(), "semantic_model")
-                if os.path.exists(model_path):
-                    self.semantic_model = SentenceTransformer(model_path)
+                if SEMANTIC_MODEL_DIR.exists():
+                    self.semantic_model = SentenceTransformer(str(SEMANTIC_MODEL_DIR))
+                    print("FUSION ENGINE: Semantic Model Ready.", flush=True)
+                elif FALLBACK_MINILM_DIR.exists():
+                    self.semantic_model = SentenceTransformer(str(FALLBACK_MINILM_DIR))
                     print("FUSION ENGINE: Semantic Model Ready.", flush=True)
                 else:
-                    print("FUSION ENGINE: Semantic model folder not found at ./semantic_model", flush=True)
+                    print("FUSION ENGINE: Local semantic model not found.", flush=True)
                     print("FUSION ENGINE: Attempting generic download...", flush=True)
                     self.semantic_model = SentenceTransformer("all-MiniLM-L6-v2")
             except Exception as e:
@@ -64,26 +106,69 @@ class MinimalSemanticEngine:
             except Exception as e:
                 print(f"FUSION ENGINE: Sentiment load failed ({e})", flush=True)
 
-        if BART_AVAILABLE:
+        if load_summarizer:
+            self.load_bart_model()
+
+    def load_bart_model(self):
+        global SHARED_BART_MODEL, SHARED_BART_TOKENIZER
+
+        if self.bart_model and self.bart_tokenizer:
+            return
+        if not BART_AVAILABLE or not BART_MODEL_DIR.exists():
+            return
+
+        with SUMMARY_MODEL_LOCK:
             try:
-                print("FUSION ENGINE: Loading Summarization...", flush=True)
-                model_path = os.path.join(os.getcwd(), "local_bart_model")
-                if not os.path.exists(model_path):
-                    model_path = os.path.join(os.getcwd(), "..", "local_bart_model")
-                if os.path.exists(model_path):
-                    self.bart_tokenizer = AutoTokenizer.from_pretrained(
-                        model_path, local_files_only=True
+                if SHARED_BART_MODEL is None or SHARED_BART_TOKENIZER is None:
+                    print("FUSION ENGINE: Loading shared summarization model...", flush=True)
+                    SHARED_BART_TOKENIZER = AutoTokenizer.from_pretrained(
+                        str(BART_MODEL_DIR), local_files_only=True
                     )
-                    self.bart_model = AutoModelForSeq2SeqLM.from_pretrained(
-                        model_path, local_files_only=True
+                    SHARED_BART_MODEL = AutoModelForSeq2SeqLM.from_pretrained(
+                        str(BART_MODEL_DIR), local_files_only=True
                     )
-                    print("FUSION ENGINE: Summarization Ready.", flush=True)
-                else:
-                    print("FUSION ENGINE: BART model not found.", flush=True)
+                    print("FUSION ENGINE: Shared summarization ready.", flush=True)
+                self.bart_tokenizer = SHARED_BART_TOKENIZER
+                self.bart_model = SHARED_BART_MODEL
             except Exception as e:
                 print(f"FUSION ENGINE: BART load failed ({e})", flush=True)
 
+    def safe_text(self, value):
+        return re.sub(r"\s+", " ", str(value or "")).strip()
+
+    def clean_content_text(self, text):
+        text = self.safe_text(text)
+        for pattern in [
+            r"(?i)\badvertisement\b",
+            r"(?i)\bsponsored\b",
+            r"(?i)\bsubscribe now\b",
+            r"(?i)\bsign up\b",
+            r"(?i)\bnewsletter\b",
+            r"(?i)\bread more\b",
+            r"(?i)\bclick here\b",
+            r"(?i)\bfollow us\b",
+            r"(?i)\ball rights reserved\b",
+            r"(?i)\bshare this article\b",
+            r"(?i)\baccept cookies\b",
+            r"(?i)\bcookie policy\b",
+            r"(?i)\bprivacy policy\b",
+            r"(?i)\bterms of use\b",
+        ]:
+            text = re.sub(pattern, " ", text)
+        text = re.sub(r"https?://\S+", " ", text)
+        return re.sub(r"\s+", " ", text).strip()
+
+    def get_article_content(self, article):
+        return (
+            self.safe_text(article.get("full_content"))
+            or self.safe_text(article.get("full_contents"))
+            or self.safe_text(article.get("summary"))
+            or self.safe_text(article.get("snippet"))
+            or self.safe_text(article.get("master_summary"))
+        )
+
     def clean_summary(self, text):
+        text = self.clean_content_text(text)
         if not text or len(text.strip()) < 20:
             return "No summary available."
         sentences = [
@@ -107,6 +192,7 @@ class MinimalSemanticEngine:
 
     def generate_ppt_summary(self, text_list):
         combined_text = " ".join(text_list)
+        self.load_bart_model()
         if not self.bart_model or len(combined_text) < 200:
             return self.clean_summary(combined_text)
         try:
@@ -114,11 +200,12 @@ class MinimalSemanticEngine:
                 [combined_text], max_length=1024,
                 return_tensors="pt", truncation=True
             )
-            summary_ids = self.bart_model.generate(
-                inputs["input_ids"],
-                num_beams=2, min_length=60, max_length=200, early_stopping=True,
-                length_penalty=2.0, no_repeat_ngram_size=3,
-            )
+            with SUMMARY_INFERENCE_LOCK:
+                summary_ids = self.bart_model.generate(
+                    inputs["input_ids"],
+                    num_beams=2, min_length=60, max_length=200, early_stopping=True,
+                    length_penalty=2.0, no_repeat_ngram_size=3,
+                )
             return self.bart_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
         except:
             return self.clean_summary(combined_text)
@@ -126,6 +213,7 @@ class MinimalSemanticEngine:
     def generate_dynamic_summary(self, text_list):
         combined_text = " ".join(text_list)
         word_count = len(combined_text.split())
+        self.load_bart_model()
         if not self.bart_model or word_count < 40:
             return self.clean_summary(combined_text)
         if word_count < 150: min_len, max_len = 40, 100
@@ -136,11 +224,12 @@ class MinimalSemanticEngine:
                 [combined_text], max_length=1024,
                 return_tensors="pt", truncation=True
             )
-            summary_ids = self.bart_model.generate(
-                inputs["input_ids"],
-                num_beams=4, min_length=min_len, max_length=max_len, early_stopping=True,
-                length_penalty=2.0, no_repeat_ngram_size=3,
-            )
+            with SUMMARY_INFERENCE_LOCK:
+                summary_ids = self.bart_model.generate(
+                    inputs["input_ids"],
+                    num_beams=4, min_length=min_len, max_length=max_len, early_stopping=True,
+                    length_penalty=2.0, no_repeat_ngram_size=3,
+                )
             return self.bart_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
         except Exception as e:
             print(f"FUSION ENGINE: Dynamic Summary Error ({e})", flush=True)
@@ -189,13 +278,22 @@ class MinimalSemanticEngine:
         final_score = (source_score * 50) + (diversity_score * 30) + (recency_score * 20)
         return round(final_score, 0)
 
-    def semantic_cluster(self, articles):
+    def build_cluster_text(self, article):
+        keywords = article.get("keywords_found", [])
+        if isinstance(keywords, list):
+            keywords = ", ".join(str(keyword) for keyword in keywords)
+        return self.clean_content_text(
+            f"Title: {article.get('title', '')} "
+            f"Keywords: {keywords} Content: {self.get_article_content(article)[:MAX_CLUSTER_TEXT_CHARS]}"
+        )
+
+    def semantic_cluster(self, articles, distance_threshold=DEFAULT_CLUSTER_DISTANCE_THRESHOLD):
         if not self.semantic_model or not CLUSTERING_AVAILABLE or len(articles) < 2:
             print(f"FUSION WARNING: Clustering skipped. Model loaded: {self.semantic_model is not None}", flush=True)
             return [[art] for art in articles]
         try:
             print(f"FUSION ENGINE: Computing embeddings for {len(articles)} articles...", flush=True)
-            texts = [f"{art.get('title', '')} {art.get('snippet', '')}" for art in articles]
+            texts = [self.build_cluster_text(art) for art in articles]
 
             if len(texts) > 50:
                 batch_size = 32
@@ -211,31 +309,43 @@ class MinimalSemanticEngine:
                 embeddings = self.semantic_model.encode(texts, show_progress_bar=False)
 
             embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
-            clusterer = AgglomerativeClustering(
-                n_clusters=None, metric="euclidean", linkage="average", distance_threshold=0.6,
-            )
+            try:
+                clusterer = AgglomerativeClustering(
+                    n_clusters=None, metric="cosine", linkage="average",
+                    distance_threshold=distance_threshold,
+                )
+            except TypeError:
+                clusterer = AgglomerativeClustering(
+                    n_clusters=None, affinity="cosine", linkage="average",
+                    distance_threshold=distance_threshold,
+                )
             labels = clusterer.fit_predict(embeddings)
             clusters = {}
             for idx, label in enumerate(labels):
                 if label not in clusters: clusters[label] = []
                 clusters[label].append(articles[idx])
-            print(f"FUSION ENGINE: Condensed {len(articles)} articles into {len(clusters)} events.", flush=True)
+            print(f"FUSION ENGINE: Condensed {len(articles)} articles into {len(clusters)} events. (cosine distance threshold={distance_threshold})", flush=True)
             return list(clusters.values())
         except Exception as e:
             print(f"FUSION ENGINE: Clustering Error ({e})", flush=True)
             return [[art] for art in articles]
 
-    def _build_event(self, article, all_articles, seen_registry, current_run_time, fast_mode, event_idx=None, total=None):
+    def _build_event(
+        self,
+        article,
+        all_articles,
+        seen_registry,
+        current_run_time,
+        fast_mode,
+        force_lightweight_summary=False,
+        event_idx=None,
+        total=None,
+    ):
         prefix = ""
         if event_idx is not None and total is not None:
             prefix = f"[{event_idx}/{total}] "
         title_preview = article.get("title", "Untitled")[:60]
-        content = (
-            article.get("full_content", "")
-            or article.get("full_contents", "")
-            or article.get("summary", "")
-            or article.get("snippet", "")
-        )
+        content = self.clean_content_text(self.get_article_content(article))
         summaries = [content[:1500]]
         full_contents = (
             article.get("full_content", "")
@@ -251,11 +361,11 @@ class MinimalSemanticEngine:
         elif main_link != "#":
             seen_registry[main_link] = current_run_time
 
-        if fast_mode:
+        if fast_mode or force_lightweight_summary:
             combined = " ".join([s for s in summaries if s.strip()])
             dynamic_summary = self.clean_summary(combined)
             ppt_summary = dynamic_summary
-            print(f"FUSION ENGINE: {prefix}[FAST] Cleaned: {title_preview}", flush=True)
+            print(f"FUSION ENGINE: {prefix}[LIGHT] Prepared: {title_preview}", flush=True)
         else:
             print(f"FUSION ENGINE: {prefix}BART summarizing: {title_preview}...", flush=True)
             ppt_summary = self.generate_ppt_summary(summaries)
@@ -295,11 +405,10 @@ class MinimalSemanticEngine:
 
     def fuse_stream(self, job_id=None, fast_mode=False):
         if job_id:
-            input_file = os.path.join(os.getcwd(), f"ui_results_{job_id}.json")
+            input_file = str(BASE_DIR / f"ui_results_{job_id}.json")
         else:
-            input_file = os.path.join(os.getcwd(), "ui_results.json")
-        registry_file = os.path.join(os.getcwd(), "seen_registry.json")
-        mode_label = "FAST (no BART)" if fast_mode else "DEEP (BART enabled)"
+            input_file = str(BASE_DIR / "ui_results.json")
+        mode_label = "FAST" if fast_mode else "LIGHT STREAM"
         print(f"FUSION ENGINE: [STREAM] Mode -> {mode_label}", flush=True)
 
         if not os.path.exists(input_file):
@@ -312,13 +421,7 @@ class MinimalSemanticEngine:
         if not raw_articles:
             return
 
-        seen_registry = {}
-        if os.path.exists(registry_file):
-            try:
-                with open(registry_file, "r", encoding="utf-8") as f:
-                    seen_registry = json.load(f)
-            except:
-                pass
+        seen_registry = load_seen_registry()
 
         current_run_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
         total = len(raw_articles)
@@ -329,6 +432,7 @@ class MinimalSemanticEngine:
                 event = self._build_event(
                     article, raw_articles, seen_registry,
                     current_run_time, fast_mode,
+                    force_lightweight_summary=True,
                     event_idx=idx, total=total,
                 )
                 print(f"FUSION ENGINE: [{idx}/{total}] ✓ Streamed: {article.get('title', '')[:50]}", flush=True)
@@ -337,19 +441,16 @@ class MinimalSemanticEngine:
                 print(f"FUSION ENGINE: [{idx}/{total}] ✗ Error: {e}", flush=True)
                 continue
 
-        with open(registry_file, "w", encoding="utf-8") as f:
-            json.dump(seen_registry, f, indent=4)
+        merge_seen_registry(seen_registry)
         print(f"FUSION ENGINE: [STREAM] All {total} articles streamed.", flush=True)
 
     def fuse_cluster(self, job_id=None, fast_mode=False):
         if job_id:
-            input_file = os.path.join(os.getcwd(), f"ui_results_{job_id}.json")
-            output_file = os.path.join(os.getcwd(), f"clustered_results_{job_id}.json")
+            input_file = str(BASE_DIR / f"ui_results_{job_id}.json")
+            output_file = str(BASE_DIR / f"clustered_results_{job_id}.json")
         else:
-            input_file = os.path.join(os.getcwd(), "ui_results.json")
-            output_file = os.path.join(os.getcwd(), "clustered_results.json")
-        registry_file = os.path.join(os.getcwd(), "seen_registry.json")
-
+            input_file = str(BASE_DIR / "ui_results.json")
+            output_file = str(BASE_DIR / "clustered_results.json")
         print(f"FUSION ENGINE: [CLUSTER] Starting re-cluster...", flush=True)
 
         if not os.path.exists(input_file):
@@ -366,13 +467,7 @@ class MinimalSemanticEngine:
                 json.dump([], f)
             return
 
-        seen_registry = {}
-        if os.path.exists(registry_file):
-            try:
-                with open(registry_file, "r", encoding="utf-8") as f:
-                    seen_registry = json.load(f)
-            except:
-                pass
+        seen_registry = load_seen_registry()
 
         current_run_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
         clusters = self.semantic_cluster(raw_articles)
@@ -405,18 +500,12 @@ class MinimalSemanticEngine:
 
             summaries = []
             for art in cluster:
-                content = (
-                    art.get("full_content", "")
-                    or art.get("full_contents", "")
-                    or art.get("summary", "")
-                    or art.get("snippet", "")
-                )
+                content = self.clean_content_text(self.get_article_content(art))
                 summaries.append(content[:1500])
 
-            full_contents = " ".join([
-                art.get("full_content", "") or art.get("summary", "") or art.get("snippet", "")
-                for art in cluster
-            ])
+            full_contents = " ".join(
+                self.clean_content_text(self.get_article_content(art)) for art in cluster
+            )
 
             if fast_mode:
                 combined = " ".join([s for s in summaries if s.strip()])
@@ -475,8 +564,7 @@ class MinimalSemanticEngine:
 
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(final_output, f, indent=4, ensure_ascii=False)
-        with open(registry_file, "w", encoding="utf-8") as f:
-            json.dump(seen_registry, f, indent=4)
+        merge_seen_registry(seen_registry)
 
         print(
             f"FUSION ENGINE: [CLUSTER] Complete. "
@@ -487,13 +575,11 @@ class MinimalSemanticEngine:
 
     def fuse(self, job_id=None, fast_mode=False):
         if job_id:
-            input_file = os.path.join(os.getcwd(), f"ui_results_{job_id}.json")
-            output_file = os.path.join(os.getcwd(), f"clustered_results_{job_id}.json")
+            input_file = str(BASE_DIR / f"ui_results_{job_id}.json")
+            output_file = str(BASE_DIR / f"clustered_results_{job_id}.json")
         else:
-            input_file = os.path.join(os.getcwd(), "ui_results.json")
-            output_file = os.path.join(os.getcwd(), "clustered_results.json")
-        registry_file = os.path.join(os.getcwd(), "seen_registry.json")
-
+            input_file = str(BASE_DIR / "ui_results.json")
+            output_file = str(BASE_DIR / "clustered_results.json")
         mode_label = "FAST (no BART)" if fast_mode else "DEEP (BART enabled)"
         print(f"FUSION ENGINE: Mode -> {mode_label}", flush=True)
         print(f"FUSION ENGINE: Input -> {os.path.basename(input_file)}", flush=True)
@@ -513,13 +599,7 @@ class MinimalSemanticEngine:
                 json.dump([], f)
             return
 
-        seen_registry = {}
-        if os.path.exists(registry_file):
-            try:
-                with open(registry_file, "r", encoding="utf-8") as f:
-                    seen_registry = json.load(f)
-            except:
-                pass
+        seen_registry = load_seen_registry()
 
         current_run_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
         print(f"FUSION ENGINE: Processing {len(raw_articles)} raw articles...", flush=True)
@@ -555,18 +635,12 @@ class MinimalSemanticEngine:
 
             summaries = []
             for art in cluster:
-                content = (
-                    art.get("full_content", "")
-                    or art.get("full_contents", "")
-                    or art.get("summary", "")
-                    or art.get("snippet", "")
-                )
+                content = self.clean_content_text(self.get_article_content(art))
                 summaries.append(content[:1500])
 
-            full_contents = " ".join([
-                art.get("full_content", "") or art.get("summary", "") or art.get("snippet", "")
-                for art in cluster
-            ])
+            full_contents = " ".join(
+                self.clean_content_text(self.get_article_content(art)) for art in cluster
+            )
 
             if fast_mode:
                 combined = " ".join([s for s in summaries if s.strip()])
@@ -626,8 +700,7 @@ class MinimalSemanticEngine:
 
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(final_output, f, indent=4, ensure_ascii=False)
-        with open(registry_file, "w", encoding="utf-8") as f:
-            json.dump(seen_registry, f, indent=4)
+        merge_seen_registry(seen_registry)
 
         print(f"FUSION ENGINE: Complete. Output -> {os.path.basename(output_file)}", flush=True)
 

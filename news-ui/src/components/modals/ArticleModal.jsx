@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Icon from '../Icon.jsx';
 import Bouncer from '../Bouncer.jsx';
+import { getInsight } from '../../api.js';
 import { scoreOf, sourceList } from '../../utils/intelligence.js';
 import { SignalVisual } from '../ArticleCard.jsx';
 
@@ -181,6 +182,48 @@ export default function ArticleModal({
   onCorrectRegion,
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [whyMatters, setWhyMatters] = useState('');
+  const [insightLoading, setInsightLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!item) {
+      setWhyMatters('');
+      setInsightLoading(false);
+      return undefined;
+    }
+
+    if (item.why_matters) {
+      setWhyMatters(item.why_matters);
+      setInsightLoading(false);
+      return undefined;
+    }
+
+    setWhyMatters('');
+    setInsightLoading(true);
+    getInsight({
+      title: item.title,
+      master_summary: item.summary,
+      summary: item.summary,
+      category: item.category,
+      source_count: item.source_count,
+    })
+      .then((response) => {
+        if (!cancelled) setWhyMatters(response?.why_matters || '');
+      })
+      .catch(() => {
+        if (!cancelled) setWhyMatters('');
+      })
+      .finally(() => {
+        if (!cancelled) setInsightLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item?.id, item?.title, item?.summary, item?.why_matters]);
+
   if (!item) return null;
 
   const score = scoreOf(item);
@@ -222,7 +265,9 @@ export default function ArticleModal({
             <section className="dossier-section mt-8">
               <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Why This Matters</h4>
               <p className="mt-3 text-base leading-8 text-slate-300">
-                {item.why_matters || `This signal is ranked at ${score}/100 from ${item.source_count || sources.length || 1} source${(item.source_count || sources.length || 1) === 1 ? '' : 's'}, with category and regional context for briefing review.`}
+                {insightLoading
+                  ? 'Generating strategic implication...'
+                  : whyMatters || `This signal is ranked at ${score}/100 from ${item.source_count || sources.length || 1} source${(item.source_count || sources.length || 1) === 1 ? '' : 's'}, with category and regional context for briefing review.`}
               </p>
             </section>
 

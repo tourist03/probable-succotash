@@ -48,37 +48,294 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Semaphore
 
 # ==========================================
-# --- WAKE UP THE AI GATEKEEPER ---
+# AI GATEKEEPER MODEL LOADING
 # ==========================================
 print("Waking up the AI Gatekeeper...")
+
+BOUNCER_MODEL_FILENAMES = {
+    "default": "bouncer_model.pkl",
+    "broadcast": "bouncer_model_broadcast.pkl",
+}
+
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     model_folder = os.path.join(current_dir, "local_miniLM_model")
-    brain_file = os.path.join(current_dir, "bouncer_model.pkl")
     bouncer_embedder = SentenceTransformer(model_folder)
-    with open(brain_file, "rb") as f:
-        bouncer_model = pickle.load(f)
-    print("✅ AI Gatekeeper is awake and watching the door.")
+    bouncer_models = {}
+
+    for profile_name, model_filename in BOUNCER_MODEL_FILENAMES.items():
+        model_path = os.path.join(current_dir, model_filename)
+        if not os.path.exists(model_path):
+            print(f"No {profile_name} bouncer found yet: {model_filename}")
+            continue
+        try:
+            with open(model_path, "rb") as f:
+                bouncer_models[profile_name] = pickle.load(f)
+            print(f"Loaded {profile_name} bouncer: {model_filename}")
+        except Exception as model_error:
+            print(
+                f"Could not load {profile_name} bouncer "
+                f"({model_filename}): {model_error}"
+            )
+
+    bouncer_model = bouncer_models.get("default")
+    if bouncer_models:
+        print("AI Gatekeeper is awake and profile-aware.")
+    else:
+        print("No bouncer models loaded. Scanning without filter.")
 except Exception as e:
-    print(f"⚠️  Warning: Gatekeeper not found. Scanning without filter. Error: {e}")
+    print(f"Warning: Gatekeeper not found. Scanning without filter. Error: {e}")
     bouncer_embedder = None
+    bouncer_models = {}
     bouncer_model = None
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ==========================================
-# --- CONFIGURATION ---
+# CONFIGURATION
 # ==========================================
-MORNING_KEYWORDS = "OpenAI , Robot , Samsung , LG , Sony , Nvidia , TCL , OLED , QNED , Artificial Intelligence, chatGPT , Anthropic , Claude , Gemini , LED , Robotics , Television , TV , display , Grok , GPU , Processor , Jio , TPU"
+MORNING_KEYWORDS = (
+    "OpenAI , Robot , Samsung , LG , Sony , Nvidia , TCL , OLED , QNED , "
+    "Artificial Intelligence, chatGPT , Anthropic , Claude , Gemini , LED , "
+    "Robotics , Television , TV , display , Grok , GPU , Processor , Jio , TPU"
+)
+BROADCAST_MORNING_KEYWORDS = (
+    "DTH, Cable TV, IPTV, Broadcast, Digital terrestrial transmission, DTT, "
+    "DVB S, DVB S2, DVB C, DVB C2, DVB T, DVB T2, conditional access system, "
+    "digital rights management, FAST, OTT, Connected TV, Tuner, Set top box, "
+    "Linear ad insertion, Linear ads, TRAI, MIB, broadcast regulation, HBB TV, "
+    "DVB I, 5G broadcast, D2M"
+)
 DIRECTOR_KEY = os.environ.get("DIRECTOR_KEY", "1357")
-HISTORY_DIR = os.path.join(os.getcwd(), "history_archive")
-MANUAL_LOG_FILE = os.path.join(os.getcwd(), "manual_search_logs.xlsx")
-WORKFLOW_FILE = os.path.join(os.getcwd(), "workflow_store.json")
-TRAINING_FILE = os.path.join(os.getcwd(), "trainingData.json")
-NOT_INTERESTED_FILE = os.path.join(os.getcwd(), "not_interested_store.json")
+ANALYTICS_KEY = os.environ.get("ANALYTICS_KEY", DIRECTOR_KEY)
+ROOT_DIR = os.getcwd()
+HISTORY_DIR = os.path.join(ROOT_DIR, "history_archive")
+MANUAL_LOG_FILE = os.path.join(ROOT_DIR, "manual_search_logs.xlsx")
+WORKFLOW_FILE = os.path.join(ROOT_DIR, "workflow_store.json")
+TRAINING_FILE = os.path.join(ROOT_DIR, "trainingData.json")
+NOT_INTERESTED_FILE = os.path.join(ROOT_DIR, "not_interested_store.json")
 NOT_INTERESTED_EXPIRY_HOURS = 22
-USAGE_TRACKER_FILE = os.path.join(os.getcwd(), "usage_tracker.json")
-REGION_LEARNING_FILE = os.path.join(os.getcwd(), "region_learning.json")
+USAGE_TRACKER_FILE = os.path.join(ROOT_DIR, "usage_tracker.json")
+
+# ==========================================
+# PROFILE ROUTING AND STORAGE
+# ==========================================
+DEFAULT_PROFILE = "default"
+BROADCAST_PROFILE = "broadcast"
+BROADCAST_SPECIAL_IPS = {
+    "107.109.202.212",
+    "107.109.202.33",
+}
+ANALYTICS_ALLOWED_IPS = {
+    ip.strip()
+    for ip in os.environ.get(
+        "ANALYTICS_ALLOWED_IPS",
+        "127.0.0.1,::1,107.109.201.245",
+    ).split(",")
+    if ip.strip()
+}
+
+DEFAULT_SITES_FILE = os.path.join(ROOT_DIR, "sites.json")
+BROADCAST_SITES_FILE = os.path.join(ROOT_DIR, "sites_broadcast.json")
+INTELLIGENCE_STORE_DIR = os.path.join(ROOT_DIR, "intelligence_store")
+
+PROFILE_CONFIGS = {
+    DEFAULT_PROFILE: {
+        "label": "Default Intelligence",
+        "keywords": MORNING_KEYWORDS,
+        "sites_file": DEFAULT_SITES_FILE,
+        "history_dir": os.path.join(INTELLIGENCE_STORE_DIR, DEFAULT_PROFILE, "history"),
+        "use_bouncer": True,
+    },
+    BROADCAST_PROFILE: {
+        "label": "Broadcast Intelligence",
+        "keywords": BROADCAST_MORNING_KEYWORDS,
+        "sites_file": BROADCAST_SITES_FILE,
+        "history_dir": os.path.join(INTELLIGENCE_STORE_DIR, BROADCAST_PROFILE, "history"),
+        "use_bouncer": True,
+    },
+}
+WORKFLOW_FILES = {
+    DEFAULT_PROFILE: WORKFLOW_FILE,
+    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "workflow_store_broadcast.json"),
+}
+NOT_INTERESTED_FILES = {
+    DEFAULT_PROFILE: NOT_INTERESTED_FILE,
+    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "not_interested_store_broadcast.json"),
+}
+TRAINING_FILES = {
+    DEFAULT_PROFILE: TRAINING_FILE,
+    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "trainingData_broadcast.json"),
+}
+BOUNCER_MODEL_FILES = {
+    DEFAULT_PROFILE: os.path.join(ROOT_DIR, "bouncer_model.pkl"),
+    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "bouncer_model_broadcast.pkl"),
+}
+REGION_LEARNING_FILES = {
+    DEFAULT_PROFILE: os.path.join(ROOT_DIR, "region_learning.json"),
+    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "region_learning_broadcast.json"),
+}
+
+TEAM_IP_MAP = {
+    "107.109.202.151": "Shreya Gupta",
+    "107.109.201.245": "Vineet Singh",
+    "107.109.202.48": "Shivani Goyal",
+    "107.109.201.45": "ASHOK JAIN",
+    "107.109.201.66": "Priya Arora",
+    "107.109.201.83": "Vinod Sati",
+    "107.109.201.58": "Ravi Kant Bansal",
+    "107.109.202.178": "Traxon PC(HOST)",
+    "107.109.201.101": "Utkarsh Tiwari",
+}
+
+
+def get_client_ip(request: Request = None):
+    if not request:
+        return "unknown"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "unknown"
+
+
+def get_profile_for_request(request: Request = None):
+    if request:
+        requested_profile = (
+            request.headers.get("x-sense-profile")
+            or request.query_params.get("profile")
+            or ""
+        ).strip().lower()
+        if requested_profile in PROFILE_CONFIGS:
+            return requested_profile
+
+    return (
+        BROADCAST_PROFILE
+        if get_client_ip(request) in BROADCAST_SPECIAL_IPS
+        else DEFAULT_PROFILE
+    )
+
+
+def get_active_profile_name(request: Request = None):
+    return get_profile_for_request(request)
+
+
+def get_profile_config(profile: str):
+    return PROFILE_CONFIGS.get(profile, PROFILE_CONFIGS[DEFAULT_PROFILE])
+
+
+def get_sites_file_for_profile(profile: str):
+    return get_profile_config(profile)["sites_file"]
+
+
+def get_profile_history_dir(profile: str):
+    history_dir = get_profile_config(profile)["history_dir"]
+    os.makedirs(history_dir, exist_ok=True)
+    return history_dir
+
+
+def ensure_profile_storage():
+    for profile in PROFILE_CONFIGS:
+        os.makedirs(get_profile_history_dir(profile), exist_ok=True)
+
+
+def get_profile_history_files(profile: str, include_legacy_default: bool = True):
+    files = glob.glob(os.path.join(get_profile_history_dir(profile), "*.json"))
+    if include_legacy_default and profile == DEFAULT_PROFILE:
+        files.extend(glob.glob(os.path.join(HISTORY_DIR, "*.json")))
+    return list(dict.fromkeys(os.path.abspath(file_path) for file_path in files))
+
+
+def resolve_profile_history_file(filename: str, profile: str):
+    safe_name = Path(filename).name
+    profile_path = os.path.join(get_profile_history_dir(profile), safe_name)
+    if os.path.exists(profile_path):
+        return profile_path
+    legacy_path = os.path.join(HISTORY_DIR, safe_name)
+    if profile == DEFAULT_PROFILE and os.path.exists(legacy_path):
+        return legacy_path
+    return None
+
+
+def get_latest_briefing_file_for_profile(profile: str):
+    files = glob.glob(os.path.join(get_profile_history_dir(profile), "briefing_*.json"))
+    if profile == DEFAULT_PROFILE and not files:
+        files = glob.glob(os.path.join(HISTORY_DIR, "briefing_*.json"))
+    valid_files = []
+    for file_path in files:
+        try:
+            with open(file_path, "r", encoding="utf-8") as file_obj:
+                if json.load(file_obj):
+                    valid_files.append(file_path)
+        except Exception:
+            continue
+    return max(valid_files, key=os.path.getmtime) if valid_files else None
+
+
+def get_workflow_file_for_request(request: Request = None):
+    return WORKFLOW_FILES.get(get_profile_for_request(request), WORKFLOW_FILE)
+
+
+def get_not_interested_file_for_profile(profile: str):
+    return NOT_INTERESTED_FILES.get(profile, NOT_INTERESTED_FILE)
+
+
+def get_training_file_for_profile(profile: str):
+    return TRAINING_FILES.get(profile, TRAINING_FILE)
+
+
+def get_bouncer_model_file_for_profile(profile: str):
+    return BOUNCER_MODEL_FILES.get(profile, BOUNCER_MODEL_FILES[DEFAULT_PROFILE])
+
+
+def get_bouncer_model_for_profile(profile: str):
+    return bouncer_models.get(profile) if bouncer_embedder is not None else None
+
+
+def get_team_owner_for_ip(ip: str):
+    return TEAM_IP_MAP.get(str(ip or "").strip())
+
+
+def is_analytics_allowed_ip(ip: str) -> bool:
+    return str(ip or "").strip() in ANALYTICS_ALLOWED_IPS
+
+
+def require_analytics_access(request: Request, key: str = None):
+    ip = get_client_ip(request)
+
+    if not is_analytics_allowed_ip(ip):
+        raise HTTPException(status_code=403, detail="Analytics is not enabled for this network.")
+
+    if key != ANALYTICS_KEY:
+        raise HTTPException(status_code=403, detail="Invalid analytics key.")
+
+    return ip
+
+
+def get_profile_debug_info(profile: str):
+    config = get_profile_config(profile)
+    latest_file = get_latest_briefing_file_for_profile(profile)
+    return {
+        "profile": profile,
+        "label": config["label"],
+        "sites_file": config["sites_file"],
+        "sites_file_exists": os.path.exists(config["sites_file"]),
+        "history_dir": config["history_dir"],
+        "history_dir_exists": os.path.exists(config["history_dir"]),
+        "latest_briefing": os.path.basename(latest_file) if latest_file else None,
+        "bouncer_model_file": get_bouncer_model_file_for_profile(profile),
+        "bouncer_model_exists": os.path.exists(get_bouncer_model_file_for_profile(profile)),
+        "training_file": get_training_file_for_profile(profile),
+        "training_file_exists": os.path.exists(get_training_file_for_profile(profile)),
+        "not_interested_file": get_not_interested_file_for_profile(profile),
+        "not_interested_file_exists": os.path.exists(get_not_interested_file_for_profile(profile)),
+    }
+
+
+BOUNCER_LOW_PRIORITY_THRESHOLD = 0.45
+BOUNCER_HARD_DROP_THRESHOLD = 0.60
 
 # ==========================================
 # --- THREAD POOL FOR ML INFERENCE ---
@@ -103,6 +360,10 @@ train_lock = threading.Lock()
 not_interested_lock = threading.Lock()
 tracker_lock = threading.Lock()
 region_learning_lock = threading.Lock()
+dropped_lock = threading.Lock()
+opinion_lock = threading.Lock()
+insight_cache_lock = threading.Lock()
+insight_cache = {}
 
 CLOSE_FDS = platform.system() != "Windows"
 
@@ -129,14 +390,100 @@ def generate_opinion(text):
         return "Insight generation unavailable."
     try:
         prompt = f"Briefly analyze this news and give a one-sentence professional opinion: {text[:500]}"
-        inputs = tokenizer(
-            prompt, return_tensors="pt", max_length=512, truncation=True
-        )
-        outputs = model.generate(**inputs, max_new_tokens=40, do_sample=False)
+        with opinion_lock:
+            inputs = tokenizer(
+                prompt, return_tensors="pt", max_length=512, truncation=True
+            )
+            outputs = model.generate(**inputs, max_new_tokens=40, do_sample=False)
         return tokenizer.decode(outputs[0], skip_special_tokens=True)
     except Exception as e:
         print(f"Insight Gen Error: {e}")
         return "Could not compute insight."
+
+
+def fallback_why_it_matters(item):
+    source_count = int(item.get("source_count", 1) or 1)
+    category = str(item.get("category", "technology intelligence") or "technology intelligence")
+    category_lower = category.lower()
+    if "broadcast" in category_lower:
+        consequence = "It could reshape distribution reach, rights economics, and regulatory priorities for broadcast operators."
+    elif "ai" in category_lower:
+        consequence = "It may shift product capability, compute demand, and competitive positioning for AI teams."
+    elif any(term in category_lower for term in ["display", "television", "device"]):
+        consequence = "It may influence product roadmaps, supplier choices, and near-term competitive differentiation."
+    else:
+        consequence = "It may change competitive priorities, investment choices, or execution risk for decision-makers."
+    return (
+        f"{consequence} The signal is supported by {source_count} "
+        f"source{'s' if source_count != 1 else ''}."
+    )
+
+
+def is_weak_generated_insight(insight, title):
+    generated_words = re.findall(r"[a-z0-9]+", str(insight or "").lower())
+    title_words = set(re.findall(r"[a-z0-9]+", str(title or "").lower()))
+    if len(generated_words) < 9:
+        return True
+    overlap = sum(1 for word in generated_words if word in title_words)
+    return overlap / max(len(generated_words), 1) > 0.7
+
+
+def generate_why_it_matters(item, profile=DEFAULT_PROFILE):
+    title = str(item.get("title", "") or "").strip()
+    summary = str(
+        item.get("master_summary")
+        or item.get("summary")
+        or item.get("snippet")
+        or ""
+    ).strip()
+    cache_key = hashlib.sha256(
+        f"{profile}|{title}|{summary[:1000]}".encode("utf-8")
+    ).hexdigest()
+
+    with insight_cache_lock:
+        cached = insight_cache.get(cache_key)
+    if cached:
+        return cached[0], f"{cached[1]}-cache"
+
+    if not model or not tokenizer or not summary:
+        insight = fallback_why_it_matters(item)
+        source = "fallback"
+    else:
+        prompt = (
+            "You are preparing an executive intelligence briefing. "
+            "Complete the sentence 'This matters because...' in one concise sentence, "
+            "describing strategic impact, risk, opportunity, or market consequence, "
+            "not repeating the headline. "
+            f"Title: {title}. Summary: {summary[:800]}"
+        )
+        try:
+            with opinion_lock:
+                inputs = tokenizer(
+                    prompt,
+                    return_tensors="pt",
+                    max_length=512,
+                    truncation=True,
+                )
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=64,
+                    do_sample=False,
+                )
+            insight = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+            source = "flan-t5-local"
+            if is_weak_generated_insight(insight, title):
+                insight = fallback_why_it_matters(item)
+                source = "fallback-after-flan"
+        except Exception as e:
+            print(f"Why It Matters Gen Error: {e}")
+            insight = fallback_why_it_matters(item)
+            source = "fallback"
+
+    with insight_cache_lock:
+        if len(insight_cache) >= 1000:
+            insight_cache.pop(next(iter(insight_cache)))
+        insight_cache[cache_key] = (insight, source)
+    return insight, source
 
 
 # ==========================================
@@ -152,6 +499,11 @@ def determine_target_team(title, summary):
         return "Robotics Team"
     elif any(k in text for k in ["tv", "oled", "display", "tizen", "streaming"]):
         return "TV & Display Team"
+    elif any(
+        k in text
+        for k in ["broadcast", "dth", "iptv", "ott", "dvb", "set top box", "trai", "mib"]
+    ):
+        return "Broadcast Team"
     else:
         return "ALL"
 
@@ -213,7 +565,11 @@ CATEGORY_MATRIX = {
         "filed a patent",
     ],
     "Broadcasting": [
-        "broadcast", "atsc", "streaming tech", "live stream", "broadcaster",
+        "broadcast", "dth", "cable tv", "iptv", "dvb", "ott", "fast",
+        "connected tv", "set top box", "tuner", "linear ad insertion",
+        "trai", "mib", "broadcast regulation", "hbbtv", "5g broadcast", "d2m",
+        "digital terrestrial transmission", "conditional access",
+        "digital rights management",
     ],
     "AI Features": [
         "ai-powered", "generative ai", "genai", "ai capability",
@@ -260,12 +616,17 @@ def normalize_region_keywords(value):
     return keywords[:20]
 
 
-def load_region_learning():
+def get_region_learning_file_for_profile(profile: str):
+    return REGION_LEARNING_FILES.get(profile, REGION_LEARNING_FILES[DEFAULT_PROFILE])
+
+
+def load_region_learning(profile=DEFAULT_PROFILE):
     blank = {"Local": [], "Global": [], "corrections": []}
-    if not os.path.exists(REGION_LEARNING_FILE):
+    learning_file = get_region_learning_file_for_profile(profile)
+    if not os.path.exists(learning_file):
         return blank
     try:
-        with open(REGION_LEARNING_FILE, "r", encoding="utf-8") as f:
+        with open(learning_file, "r", encoding="utf-8") as f:
             stored = json.load(f)
         for region in ("Local", "Global"):
             blank[region] = normalize_region_keywords(stored.get(region, []))
@@ -275,8 +636,8 @@ def load_region_learning():
     return blank
 
 
-def save_region_learning(data):
-    with open(REGION_LEARNING_FILE, "w", encoding="utf-8") as f:
+def save_region_learning(data, profile=DEFAULT_PROFILE):
+    with open(get_region_learning_file_for_profile(profile), "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
@@ -293,10 +654,10 @@ def region_text_for_article(item):
     return " ".join(str(field) for field in fields if field).lower()
 
 
-def apply_learned_region(item):
+def apply_learned_region(item, profile=DEFAULT_PROFILE):
     if not isinstance(item, dict):
         return item
-    learned = load_region_learning()
+    learned = load_region_learning(profile)
     title = str(item.get("title", "")).strip().lower()
     for correction in reversed(learned["corrections"]):
         if title and title == str(correction.get("title", "")).strip().lower():
@@ -316,8 +677,8 @@ def apply_learned_region(item):
     return item
 
 
-def apply_learned_regions(items):
-    return [apply_learned_region(item) for item in (items or [])]
+def apply_learned_regions(items, profile=DEFAULT_PROFILE):
+    return [apply_learned_region(item, profile) for item in (items or [])]
 
 
 # ==========================================
@@ -361,29 +722,62 @@ def cleanup_job_files(*files):
 
 
 # ==========================================
-# --- BOUNCER: Confidence-based filtering ---
-# Threshold: 0.60 (tuned from diagnostic)
+# BOUNCER HELPERS
 # ==========================================
-def bouncer_check(title, summary, keywords_found=None):
-    if bouncer_embedder is None or bouncer_model is None:
-        return True
+def normalize_bouncer_keywords(keywords_found):
+    if isinstance(keywords_found, list):
+        return ", ".join(str(keyword).strip() for keyword in keywords_found if str(keyword).strip())
+    return str(keywords_found or "").strip()
+
+
+def build_bouncer_text(title, summary, keywords_found=None):
+    return (
+        f"Title: {str(title or '').strip()}\n"
+        f"Keywords: {normalize_bouncer_keywords(keywords_found)}\n"
+        f"Summary: {str(summary or '').strip()}"
+    )
+
+
+def get_bouncer_not_interested_score(
+    title,
+    summary,
+    keywords_found=None,
+    profile=DEFAULT_PROFILE,
+):
+    model_for_profile = get_bouncer_model_for_profile(profile)
+    if bouncer_embedder is None or model_for_profile is None:
+        return None
     try:
-        if keywords_found and len(keywords_found) > 0:
-            keyword_str = ", ".join(keywords_found[:3])
-        else:
-            keyword_str = title
-        check_text = f"Keywords: {keyword_str}. Summary: {summary}"
+        check_text = build_bouncer_text(title, summary, keywords_found)
         vector = bouncer_embedder.encode([check_text])
-        if hasattr(bouncer_model, "predict_proba"):
-            prediction_proba = bouncer_model.predict_proba(vector)[0]
-            confidence_irrelevant = prediction_proba[0]
-            return confidence_irrelevant < 0.60
-        else:
-            prediction = bouncer_model.predict(vector)[0]
-            return prediction == 1
+        if hasattr(model_for_profile, "predict_proba"):
+            probabilities = model_for_profile.predict_proba(vector)[0]
+            classes = list(getattr(model_for_profile, "classes_", []))
+            for candidate in [0, "0", "not_interested", "not_intrested", "irrelevant", "drop", "dislike"]:
+                if candidate in classes:
+                    return float(probabilities[classes.index(candidate)])
+            print(f"[BOUNCER:{profile}] Could not identify not_interested class: {classes}")
+            return None
+        prediction = model_for_profile.predict(vector)[0]
+        return 1.0 if prediction in [0, "0", "not_interested", "not_intrested", "irrelevant", "drop", "dislike"] else 0.0
     except Exception as e:
-        print(f"Bouncer error: {e}")
-        return True
+        print(f"[BOUNCER:{profile}] Bouncer error: {e}")
+        return None
+
+
+def bouncer_decision(title, summary, keywords_found=None, profile=DEFAULT_PROFILE):
+    score = get_bouncer_not_interested_score(title, summary, keywords_found, profile)
+    if score is None:
+        return {"keep": True, "decision": "keep", "score": None, "reason": f"bouncer_unavailable_{profile}"}
+    if score >= BOUNCER_HARD_DROP_THRESHOLD:
+        return {"keep": False, "decision": "drop", "score": round(score, 4), "reason": f"high_confidence_not_interested_{profile}"}
+    if score >= BOUNCER_LOW_PRIORITY_THRESHOLD:
+        return {"keep": True, "decision": "low_priority", "score": round(score, 4), "reason": f"medium_confidence_not_interested_{profile}"}
+    return {"keep": True, "decision": "keep", "score": round(score, 4), "reason": f"likely_interesting_{profile}"}
+
+
+def bouncer_check(title, summary, keywords_found=None, profile=DEFAULT_PROFILE):
+    return bouncer_decision(title, summary, keywords_found, profile)["keep"]
 
 
 # ==========================================
@@ -419,16 +813,19 @@ class VotePayload(BaseModel):
     keywords: list
     summary: str
     vote: str
+    title: Optional[str] = ""
 
 
 # ==========================================
 # --- NOT INTERESTED STORE ---
 # ==========================================
-def load_not_interested_store():
-    if not os.path.exists(NOT_INTERESTED_FILE):
+def load_not_interested_store(request: Request = None):
+    profile = get_active_profile_name(request)
+    not_interested_file = get_not_interested_file_for_profile(profile)
+    if not os.path.exists(not_interested_file):
         return []
     try:
-        with open(NOT_INTERESTED_FILE, "r", encoding="utf-8") as f:
+        with open(not_interested_file, "r", encoding="utf-8") as f:
             store = json.load(f)
     except (json.JSONDecodeError, Exception):
         return []
@@ -451,17 +848,18 @@ def load_not_interested_store():
 
     if expired_count > 0:
         try:
-            with open(NOT_INTERESTED_FILE, "w", encoding="utf-8") as f:
+            with open(not_interested_file, "w", encoding="utf-8") as f:
                 json.dump(active, f, indent=4, ensure_ascii=False)
-            print(f"[NOT-INTERESTED] Expired {expired_count} entries (>{NOT_INTERESTED_EXPIRY_HOURS}h old)")
+            print(f"[NOT-INTERESTED:{profile}] Expired {expired_count} entries (>{NOT_INTERESTED_EXPIRY_HOURS}h old)")
         except Exception:
             pass
 
     return active
 
 
-def save_not_interested_store(store):
-    with open(NOT_INTERESTED_FILE, "w", encoding="utf-8") as f:
+def save_not_interested_store(store, request: Request = None):
+    profile = get_active_profile_name(request)
+    with open(get_not_interested_file_for_profile(profile), "w", encoding="utf-8") as f:
         json.dump(store, f, indent=4, ensure_ascii=False)
 
 
@@ -476,99 +874,177 @@ def is_already_rejected(title, store):
 # ==========================================
 # --- WORKFLOW HELPERS ---
 # ==========================================
-def load_workflow_store():
-    if not os.path.exists(WORKFLOW_FILE):
+def load_workflow_store(request: Request = None):
+    workflow_file = get_workflow_file_for_request(request)
+    if not os.path.exists(workflow_file):
         return {"selected": [], "approved": []}
     try:
-        with open(WORKFLOW_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
+        with open(workflow_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {"selected": [], "approved": []}
+        data.setdefault("selected", [])
+        data.setdefault("approved", [])
+        return data
+    except Exception:
         return {"selected": [], "approved": []}
 
 
-def save_workflow_store(data):
-    with open(WORKFLOW_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+def save_workflow_store(data, request: Request = None):
+    with open(get_workflow_file_for_request(request), "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 
 # ==========================================
 # --- DROPPED ARTICLES DATA ---
 # ==========================================
-def log_dropped_article(title, summary, keywords_found):
-    dropped_file = os.path.join(os.getcwd(), "dropped_articles.json")
+def log_dropped_article(title, summary, keywords_found, bouncer_info=None, profile=DEFAULT_PROFILE):
+    dropped_file = os.path.join(ROOT_DIR, "dropped_articles.json")
+    bouncer_info = bouncer_info or {}
     new_entry = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "profile": profile,
+        "title": title,
         "keyword": keywords_found if keywords_found else [title[:50]],
         "summary": summary,
-        "label": "not_interested"
+        "label": "not_interested",
+        "bouncer_decision": bouncer_info.get("decision", "drop"),
+        "bouncer_score": bouncer_info.get("score"),
+        "bouncer_reason": bouncer_info.get("reason", ""),
     }
-    dropped = []
-    if os.path.exists(dropped_file):
-        try:
-            with open(dropped_file, "r", encoding="utf-8") as f:
-                dropped = json.load(f)
-        except:
-            dropped = []
-    dropped.append(new_entry)
-    dropped = dropped[-500:]
-    with open(dropped_file, "w", encoding="utf-8") as f:
-        json.dump(dropped, f, indent=4, ensure_ascii=False)
+    with dropped_lock:
+        dropped = []
+        if os.path.exists(dropped_file):
+            try:
+                with open(dropped_file, "r", encoding="utf-8") as f:
+                    dropped = json.load(f)
+            except Exception:
+                dropped = []
+        dropped.append(new_entry)
+        dropped = dropped[-500:]
+        with open(dropped_file, "w", encoding="utf-8") as f:
+            json.dump(dropped, f, indent=4, ensure_ascii=False)
 
 
 # ==========================================
-# --- TRAINING HELPERS ---
+# TRAINING AND FILTER HELPERS
 # ==========================================
-def save_training_vote(keywords, summary, vote):
+def get_bouncer_summary_from_item(item):
+    parts = []
+    for key in ["master_summary", "summary", "snippet", "full_content", "full_contents"]:
+        text = str(item.get(key, "") or "").strip()
+        if text and text not in parts:
+            parts.append(text)
+    return (" ".join(parts).strip() or str(item.get("title", "")).strip())[:2500]
+
+
+def run_bouncer_filter_on_items(items, profile=DEFAULT_PROFILE, stage="raw"):
+    filtered_items = []
+    dropped_count = 0
+    low_priority_count = 0
+    for item in items if isinstance(items, list) else []:
+        decision = bouncer_decision(
+            item.get("title", ""),
+            get_bouncer_summary_from_item(item),
+            item.get("keywords_found", []),
+            profile,
+        )
+        if decision["keep"]:
+            item["profile"] = profile
+            item["bouncer_stage"] = stage
+            item["bouncer_decision"] = decision["decision"]
+            item["bouncer_score"] = decision["score"]
+            item["bouncer_reason"] = decision["reason"]
+            filtered_items.append(item)
+            if decision["decision"] == "low_priority":
+                low_priority_count += 1
+        else:
+            dropped_count += 1
+            log_dropped_article(
+                item.get("title", ""),
+                get_bouncer_summary_from_item(item),
+                item.get("keywords_found", []),
+                decision,
+                profile,
+            )
+    return filtered_items, dropped_count, low_priority_count
+
+
+def save_training_vote(keywords, summary, vote, title="", profile=DEFAULT_PROFILE):
+    training_file = get_training_file_for_profile(profile)
     new_row = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "title": str(title or "").strip(),
         "keyword": keywords,
-        "summary": summary,
+        "summary": str(summary or "").strip(),
         "label": vote,
+        "profile": profile,
     }
     with file_lock:
         memory = []
-        if os.path.exists(TRAINING_FILE):
+        if os.path.exists(training_file):
             try:
-                with open(TRAINING_FILE, "r", encoding="utf-8") as f:
+                with open(training_file, "r", encoding="utf-8") as f:
                     memory = json.load(f)
             except json.JSONDecodeError:
                 memory = []
 
-        normalized_new = summary.strip().lower()[:150]
+        normalized_title = str(title or "").strip().lower()[:150]
+        normalized_new = str(summary or "").strip().lower()[:200]
+        normalized_vote = str(vote or "").strip().lower()
         is_duplicate = False
         for existing in memory:
-            existing_summary = existing.get("summary", "").strip().lower()[:150]
+            existing_title = existing.get("title", "").strip().lower()[:150]
+            existing_summary = existing.get("summary", "").strip().lower()[:200]
             existing_vote = existing.get("label", "").strip().lower()
-            if existing_summary == normalized_new and existing_vote == vote:
+            if (
+                existing_title == normalized_title
+                and existing_summary == normalized_new
+                and existing_vote == normalized_vote
+            ):
                 is_duplicate = True
                 break
 
         if not is_duplicate:
             memory.append(new_row)
-            with open(TRAINING_FILE, "w", encoding="utf-8") as f:
-                json.dump(memory, f, indent=4)
+            with open(training_file, "w", encoding="utf-8") as f:
+                json.dump(memory, f, indent=4, ensure_ascii=False)
         else:
             print(f"Dedup: Skipped duplicate {vote} vote for: {summary[:50]}...")
 
     return len(memory)
 
 
-def retrain_and_reload():
+def reload_bouncer_model_for_profile(profile=DEFAULT_PROFILE):
+    global bouncer_model
+    model_file = get_bouncer_model_file_for_profile(profile)
+    if not os.path.exists(model_file):
+        return False
+    try:
+        with open(model_file, "rb") as f:
+            bouncer_models[profile] = pickle.load(f)
+        if profile == DEFAULT_PROFILE:
+            bouncer_model = bouncer_models.get(profile)
+        return True
+    except Exception as e:
+        print(f"[BOUNCER:{profile}] Failed to reload model: {e}")
+        return False
+
+
+def retrain_and_reload(profile=DEFAULT_PROFILE):
     if not train_lock.acquire(blocking=False):
-        print("AI is already training. Skipping duplicate request.")
+        print(f"[BOUNCER:{profile}] AI is already training. Skipping duplicate request.")
         return
     try:
-        global bouncer_model
-        print("\nRetraining Bouncer with new data...")
-        subprocess.run([sys.executable, "train_bouncer.py"], check=True)
-        brain_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "bouncer_model.pkl"
+        print(f"\n[BOUNCER:{profile}] Retraining with new data...")
+        subprocess.run(
+            [sys.executable, "train_bouncer.py", "--profile", profile],
+            check=True,
         )
-        with open(brain_file, "rb") as f:
-            bouncer_model = pickle.load(f)
-        print("Brain successfully upgraded and reloaded!\n")
+        reload_bouncer_model_for_profile(profile)
+        print(f"[BOUNCER:{profile}] Brain successfully upgraded and reloaded.\n")
     except Exception as e:
-        print(f"Failed to retrain Bouncer: {e}")
+        print(f"[BOUNCER:{profile}] Failed to retrain Bouncer: {e}")
     finally:
         train_lock.release()
 
@@ -627,9 +1103,10 @@ def purge_old_entries(device_data, keep_days=30):
 
 
 # ==========================================
-# --- AUTONOMOUS SCHEDULER ---
+# Legacy default-only scheduler retained for archive compatibility; the
+# profile-aware scheduler definition below is the runtime entry point.
 # ==========================================
-def run_morning_briefing():
+def _legacy_run_morning_briefing():
     global SCHEDULER_STATUS
 
     with scheduler_lock:
@@ -645,7 +1122,7 @@ def run_morning_briefing():
                 f"[SCHEDULER] {running_manual} manual scan(s) in progress. "
                 f"Deferring autonomous run by 10 minutes."
             )
-            threading.Timer(600, run_morning_briefing).start()
+            threading.Timer(600, _legacy_run_morning_briefing).start()
             return
 
         SCHEDULER_STATUS["is_active"] = True
@@ -808,20 +1285,132 @@ def run_morning_briefing():
 
 
 # ==========================================
+# PROFILE-AWARE AUTONOMOUS SCHEDULER
+# ==========================================
+def run_scheduler_for_profile(profile: str):
+    config = get_profile_config(profile)
+    today = datetime.datetime.now()
+    scheduler_job_id = f"scheduler_{profile}_{today.strftime('%Y%m%d_%H%M%S')}"
+    output_file = os.path.join(ROOT_DIR, f"ui_results_{scheduler_job_id}.json")
+    cluster_file = os.path.join(ROOT_DIR, f"clustered_results_{scheduler_job_id}.json")
+    history_dir = get_profile_history_dir(profile)
+
+    if not os.path.exists(config["sites_file"]):
+        print(f"[SCHEDULER:{profile}] Missing sites file: {config['sites_file']}")
+        return
+
+    try:
+        from_date = (today - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+        to_date = today.strftime("%Y-%m-%d")
+        cmd = [
+            sys.executable, "-m", "scrapy", "crawl", "news_spider",
+            "-a", f"keyword={config['keywords']}",
+            "-a", f"from_date={from_date}",
+            "-a", f"to_date={to_date}",
+            "-a", "target_sites=All",
+            "-a", f"sites_file={config['sites_file']}",
+            "-s", "ROBOTSTXT_OBEY=False",
+            "-s", "USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "-s", "DNS_RESOLVER=scrapy.resolver.CachingThreadedResolver",
+            "-s", "TWISTED_REACTOR=twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+            "-O", output_file,
+        ]
+        print(f"[SCHEDULER:{profile}] Starting scan: {scheduler_job_id}")
+        subprocess.run(cmd, cwd=os.path.join(ROOT_DIR, "news_aggregator"), timeout=3600)
+
+        if os.path.exists(output_file) and config["use_bouncer"]:
+            with open(output_file, "r", encoding="utf-8") as f:
+                raw_data = json.load(f)
+            raw_data, dropped, low_priority = run_bouncer_filter_on_items(
+                raw_data, profile, "scheduler_raw"
+            )
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(raw_data, f, indent=4, ensure_ascii=False)
+            print(f"[SCHEDULER:{profile}] Dropped {dropped}; low priority kept {low_priority}.")
+
+        subprocess.run(
+            [sys.executable, "semantic_clustering.py", "--job-id", scheduler_job_id, "--fast-mode"],
+            cwd=ROOT_DIR,
+            timeout=3600,
+        )
+        if not os.path.exists(cluster_file):
+            print(f"[SCHEDULER:{profile}] Failed to generate cluster file.")
+            return
+        with open(cluster_file, "r", encoding="utf-8") as f:
+            results = json.load(f)
+        if results and config["use_bouncer"]:
+            results, dropped, low_priority = run_bouncer_filter_on_items(
+                results, profile, "scheduler_final"
+            )
+        for item in results:
+            item["profile"] = profile
+            item["category"] = assign_category(
+                item.get("title", ""),
+                item.get("master_summary", "") or item.get("snippet", ""),
+            )
+            item.update(apply_learned_region(item, profile))
+        if not results:
+            print(f"[SCHEDULER:{profile}] Finished but no news was found.")
+            return
+        learner.log_search_data(config["keywords"], results)
+        timestamp = today.strftime("%Y-%m-%d_%H-%M-%S")
+        history_path = os.path.join(history_dir, f"briefing_{timestamp}.json")
+        with open(history_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=4, ensure_ascii=False)
+        print(f"[SCHEDULER:{profile}] Briefing complete: {history_path}")
+    except subprocess.TimeoutExpired:
+        print(f"[SCHEDULER:{profile}] Process timed out and was terminated.")
+    except Exception as e:
+        print(f"[SCHEDULER:{profile}] Critical failure: {e}")
+    finally:
+        cleanup_job_files(output_file, cluster_file)
+
+
+def run_morning_briefing():
+    global SCHEDULER_STATUS
+    with scheduler_lock:
+        if SCHEDULER_STATUS["is_active"]:
+            return
+        if any(
+            job.get("status") in {"queued", "running"}
+            for job in active_jobs.values()
+        ):
+            print("[SCHEDULER] Manual scan admitted first. Deferring autonomous scan.")
+            threading.Timer(600, run_morning_briefing).start()
+            return
+        SCHEDULER_STATUS.update(
+            {"is_active": True, "message": "Autonomous Engine Scanning...", "mode": "autonomous"}
+        )
+    try:
+        ensure_profile_storage()
+        for profile in [DEFAULT_PROFILE, BROADCAST_PROFILE]:
+            SCHEDULER_STATUS["message"] = f"Autonomous Engine Scanning {profile} profile..."
+            run_scheduler_for_profile(profile)
+    finally:
+        with scheduler_lock:
+            SCHEDULER_STATUS.update(
+                {"is_active": False, "message": "Morning Briefing Complete.", "mode": "idle"}
+            )
+
+
+# ==========================================
 # --- LIFECYCLE ---
 # ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ensure_profile_storage()
     scheduler = BackgroundScheduler()
     next_run = datetime.datetime.now() + datetime.timedelta(minutes=2)
 
-    list_of_files = glob.glob(os.path.join(HISTORY_DIR, "briefing_*.json"))
+    list_of_files = [
+        latest
+        for profile in [DEFAULT_PROFILE, BROADCAST_PROFILE]
+        if (latest := get_latest_briefing_file_for_profile(profile))
+    ]
     if list_of_files:
-        latest_file = max(list_of_files, key=os.path.getctime)
-        filename = os.path.basename(latest_file)
+        latest_file = max(list_of_files, key=os.path.getmtime)
         try:
-            timestamp_str = filename.replace("briefing_", "").replace(".json", "")
-            last_run_time = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d_%H-%M-%S")
+            last_run_time = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file))
             target_next_run = last_run_time + datetime.timedelta(hours=4)
             if target_next_run > datetime.datetime.now():
                 next_run = target_next_run
@@ -867,10 +1456,43 @@ if os.path.exists(os.path.join(abs_frontend_path, "assets")):
 
 
 # ==========================================
+# PROFILE ENDPOINT
+# ==========================================
+@app.get("/profile")
+def get_profile(request: Request):
+    profile = get_active_profile_name(request)
+    config = get_profile_config(profile)
+    return {
+        "status": "success",
+        "ip": get_client_ip(request),
+        "profile": profile,
+        "label": config["label"],
+        "is_broadcast": profile == BROADCAST_PROFILE,
+        "paths": {
+            "sites_file": config["sites_file"],
+            "history_dir": config["history_dir"],
+            "workflow_file": get_workflow_file_for_request(request),
+            "not_interested_file": get_not_interested_file_for_profile(profile),
+            "training_file": get_training_file_for_profile(profile),
+            "bouncer_model_file": get_bouncer_model_file_for_profile(profile),
+        },
+        "all_profiles": {
+            DEFAULT_PROFILE: get_profile_debug_info(DEFAULT_PROFILE),
+            BROADCAST_PROFILE: get_profile_debug_info(BROADCAST_PROFILE),
+        },
+    }
+
+
+# ==========================================
 # --- EXPORT: POWERPOINT ---
 # ==========================================
 @app.post("/export-ppt")
-async def export_ppt(request: ExportRequest):
+async def export_ppt(http_request: Request, request: ExportRequest):
+    if get_active_profile_name(http_request) == BROADCAST_PROFILE:
+        raise HTTPException(
+            status_code=403,
+            detail="PowerPoint export is disabled for Broadcast profile.",
+        )
     safe_filename = sanitize_filename(request.filename)
     TEMPLATE_PATH = "template.pptx"
     if not os.path.exists(TEMPLATE_PATH):
@@ -1262,55 +1884,65 @@ async def export_word(request: ExportRequest):
 # --- WORKFLOW ENDPOINTS ---
 # ==========================================
 @app.get("/workflow")
-def get_workflow():
-    store = load_workflow_store()
+def get_workflow(request: Request):
+    profile = get_profile_for_request(request)
+    store = load_workflow_store(request)
     return {
-        "selected": apply_learned_regions(store.get("selected", [])),
-        "approved": apply_learned_regions(store.get("approved", [])),
+        "selected": apply_learned_regions(store.get("selected", []), profile),
+        "approved": apply_learned_regions(store.get("approved", []), profile),
+        "profile": profile,
     }
 
 
 @app.post("/workflow/select")
-def select_news(item: dict = Body(...)):
-    store = load_workflow_store()
-    if any(i["title"] == item["title"] for i in store["selected"]):
-        return {"status": "exists", "message": "Already selected"}
+def select_news(request: Request, item: dict = Body(...)):
+    profile = get_profile_for_request(request)
+    store = load_workflow_store(request)
+    if any(i.get("title") == item.get("title") for i in store["selected"]):
+        return {"status": "exists", "message": "Already selected", "profile": profile}
+    item["profile"] = profile
     store["selected"].append(item)
-    save_workflow_store(store)
-    return {"status": "success", "count": len(store["selected"])}
+    save_workflow_store(store, request)
+    return {"status": "success", "count": len(store["selected"]), "profile": profile}
 
 
 @app.post("/workflow/approve")
-def approve_news(payload: dict = Body(...)):
+def approve_news(request: Request, payload: dict = Body(...)):
+    profile = get_profile_for_request(request)
     item_title = payload.get("title")
     key = payload.get("key")
     if key != DIRECTOR_KEY:
-        return {"status": "error", "message": "Invalid Director Key"}
-    store = load_workflow_store()
+        return {"status": "error", "message": "Invalid Director Key", "profile": profile}
+    store = load_workflow_store(request)
     item_to_approve = next((i for i in store["selected"] if i["title"] == item_title), None)
     if not item_to_approve:
-        return {"status": "error", "message": "Item not found"}
+        return {"status": "error", "message": "Item not found", "profile": profile}
     store["selected"] = [i for i in store["selected"] if i["title"] != item_title]
+    item_to_approve["profile"] = profile
     store["approved"].append(item_to_approve)
-    save_workflow_store(store)
-    return {"status": "success", "message": "Approved"}
+    save_workflow_store(store, request)
+    return {"status": "success", "message": "Approved", "profile": profile}
 
 
 @app.post("/workflow/remove")
-def remove_news(payload: dict = Body(...)):
+def remove_news(request: Request, payload: dict = Body(...)):
+    profile = get_profile_for_request(request)
     title = payload.get("title")
     list_type = payload.get("list_type")
-    store = load_workflow_store()
+    if list_type not in ["selected", "approved"]:
+        return {"status": "error", "message": "Invalid list type", "profile": profile}
+    store = load_workflow_store(request)
     store[list_type] = [i for i in store[list_type] if i["title"] != title]
-    save_workflow_store(store)
-    return {"status": "success"}
+    save_workflow_store(store, request)
+    return {"status": "success", "profile": profile}
 
 
 # ==========================================
 # --- REGION CORRECTION / LEARNING ENDPOINT ---
 # ==========================================
 @app.post("/region/correct")
-def correct_region(payload: dict = Body(...)):
+def correct_region(request: Request, payload: dict = Body(...)):
+    profile = get_active_profile_name(request)
     title = str(payload.get("title", "")).strip()
     region = normalize_region_label(payload.get("region"))
     keywords = normalize_region_keywords(payload.get("keywords", []))
@@ -1327,7 +1959,7 @@ def correct_region(payload: dict = Body(...)):
 
     other_region = "Global" if region == "Local" else "Local"
     with region_learning_lock:
-        learned = load_region_learning()
+        learned = load_region_learning(profile)
         learned[other_region] = [
             keyword for keyword in learned[other_region] if keyword not in keywords
         ]
@@ -1343,10 +1975,11 @@ def correct_region(payload: dict = Body(...)):
             "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
         })
         learned["corrections"] = learned["corrections"][-500:]
-        save_region_learning(learned)
+        save_region_learning(learned, profile)
 
     return {
         "status": "success",
+        "profile": profile,
         "region": region,
         "keywords": keywords,
         "message": f"Saved. Future scans will use {len(keywords)} learned keyword(s) for {region} signals.",
@@ -1357,8 +1990,9 @@ def correct_region(payload: dict = Body(...)):
 # --- SITES ENDPOINTS ---
 # ==========================================
 @app.get("/sites")
-def get_sites():
-    sites_path = os.path.join(os.getcwd(), "sites.json")
+def get_sites(request: Request):
+    profile = get_profile_for_request(request)
+    sites_path = get_sites_file_for_profile(profile)
     if os.path.exists(sites_path):
         with open(sites_path, "r", encoding="utf-8") as f:
             sites = json.load(f)
@@ -1368,8 +2002,9 @@ def get_sites():
 
 
 @app.post("/sites")
-def add_site(site: dict):
-    sites_path = os.path.join(os.getcwd(), "sites.json")
+def add_site(site: dict, request: Request):
+    profile = get_profile_for_request(request)
+    sites_path = get_sites_file_for_profile(profile)
     sites = []
     if os.path.exists(sites_path):
         with open(sites_path, "r", encoding="utf-8") as f:
@@ -1377,32 +2012,57 @@ def add_site(site: dict):
     sites.append(site)
     with open(sites_path, "w", encoding="utf-8") as f:
         json.dump(sites, f, indent=4)
-    return {"status": "success"}
+    return {"status": "success", "profile": profile, "sites_file": sites_path}
 
 
 # ==========================================
 # --- STATUS ENDPOINT ---
 # ==========================================
 @app.get("/status")
-def get_system_status():
+def get_system_status(request: Request):
+    active_profile = get_active_profile_name(request)
     with scheduler_lock:
-        running_jobs = sum(1 for j in active_jobs.values() if j.get("status") == "running")
+        running_jobs = sum(
+            1
+            for job in active_jobs.values()
+            if job.get("status") in {"queued", "running"}
+        )
         return {
             **SCHEDULER_STATUS,
+            "active_profile": active_profile,
             "active_manual_jobs": running_jobs,
             "capacity_remaining": crawl_semaphore._value,
+            "profiles": {
+                DEFAULT_PROFILE: get_profile_debug_info(DEFAULT_PROFILE),
+                BROADCAST_PROFILE: get_profile_debug_info(BROADCAST_PROFILE),
+            },
         }
+
+
+# ==========================================
+# DOSSIER INSIGHT ENDPOINT
+# ==========================================
+@app.post("/insight")
+def get_dossier_insight(request: Request, item: dict = Body(...)):
+    profile = get_active_profile_name(request)
+    insight, generated_by = generate_why_it_matters(item, profile)
+    return {
+        "status": "success",
+        "profile": profile,
+        "why_matters": insight,
+        "generated_by": generated_by,
+    }
 
 
 # ==========================================
 # --- BRIEFING META ENDPOINT ---
 # ==========================================
 @app.get("/briefing/meta")
-def get_briefing_meta():
-    files = glob.glob(os.path.join(HISTORY_DIR, "briefing_*.json"))
-    if not files:
-        return {"last_updated": None, "count": 0, "filename": None}
-    latest = max(files, key=os.path.getmtime)
+def get_briefing_meta(request: Request):
+    profile = get_profile_for_request(request)
+    latest = get_latest_briefing_file_for_profile(profile)
+    if not latest:
+        return {"last_updated": None, "count": 0, "filename": None, "profile": profile}
     try:
         with open(latest, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -1410,50 +2070,51 @@ def get_briefing_meta():
             "last_updated": datetime.datetime.fromtimestamp(os.path.getmtime(latest)).isoformat(),
             "filename": os.path.basename(latest),
             "count": len(data),
+            "profile": profile,
         }
-    except:
-        return {"last_updated": None, "count": 0, "filename": None}
+    except Exception:
+        return {"last_updated": None, "count": 0, "filename": None, "profile": profile}
 
 
 # ==========================================
 # --- LATEST BRIEFING ENDPOINT ---
 # ==========================================
 @app.get("/latest-briefing")
-def get_latest_briefing():
-    files = glob.glob(os.path.join(HISTORY_DIR, "briefing_*.json"))
-    files.sort(key=os.path.getmtime, reverse=True)
-    for f in files:
+def get_latest_briefing(request: Request):
+    profile = get_profile_for_request(request)
+    latest = get_latest_briefing_file_for_profile(profile)
+    if latest:
         try:
-            with open(f, "r", encoding="utf-8") as file_obj:
+            with open(latest, "r", encoding="utf-8") as file_obj:
                 data = json.load(file_obj)
                 if data and len(data) > 0:
                     return {
                         "status": "success",
-                        "result": apply_learned_regions(data),
+                        "result": apply_learned_regions(data, profile),
                         "type": "scheduler",
                         "source": "shared",
-                        "filename": os.path.basename(f),
-                        "generated_at": datetime.datetime.fromtimestamp(os.path.getmtime(f)).strftime("%d %b %Y, %I:%M %p"),
+                        "profile": profile,
+                        "filename": os.path.basename(latest),
+                        "generated_at": datetime.datetime.fromtimestamp(os.path.getmtime(latest)).strftime("%d %b %Y, %I:%M %p"),
                     }
-        except:
-            continue
-    return {"status": "empty", "result": []}
+        except Exception as e:
+            return {"status": "error", "result": [], "profile": profile, "message": str(e)}
+    return {"status": "empty", "result": [], "profile": profile}
 
 
 # ==========================================
 # --- BRIEFING REMOVE/RESTORE (Disk) ---
 # ==========================================
 @app.post("/briefing/remove")
-def remove_from_briefing(payload: dict = Body(...)):
+def remove_from_briefing(request: Request, payload: dict = Body(...)):
+    profile = get_profile_for_request(request)
     title = payload.get("title", "")
     if not title:
         return {"status": "error", "message": "No title provided"}
 
-    files = glob.glob(os.path.join(HISTORY_DIR, "briefing_*.json"))
-    if not files:
+    latest = get_latest_briefing_file_for_profile(profile)
+    if not latest:
         return {"status": "error", "message": "No briefing file found"}
-
-    latest = max(files, key=os.path.getmtime)
     try:
         with open(latest, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -1464,22 +2125,21 @@ def remove_from_briefing(payload: dict = Body(...)):
             with open(latest, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
             print(f"[BRIEFING] Removed '{title[:50]}' from {os.path.basename(latest)}")
-        return {"status": "success", "removed": removed, "remaining": len(data)}
+        return {"status": "success", "removed": removed, "remaining": len(data), "profile": profile}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
 @app.post("/briefing/restore")
-def restore_to_briefing(payload: dict = Body(...)):
+def restore_to_briefing(request: Request, payload: dict = Body(...)):
+    profile = get_profile_for_request(request)
     article = payload.get("article")
     if not article:
         return {"status": "error", "message": "No article provided"}
 
-    files = glob.glob(os.path.join(HISTORY_DIR, "briefing_*.json"))
-    if not files:
+    latest = get_latest_briefing_file_for_profile(profile)
+    if not latest:
         return {"status": "error", "message": "No briefing file found"}
-
-    latest = max(files, key=os.path.getmtime)
     try:
         with open(latest, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -1488,7 +2148,7 @@ def restore_to_briefing(payload: dict = Body(...)):
             with open(latest, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
             print(f"[BRIEFING] Restored '{article.get('title', '')[:50]}' to {os.path.basename(latest)}")
-        return {"status": "success", "count": len(data)}
+        return {"status": "success", "count": len(data), "profile": profile}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -1497,8 +2157,9 @@ def restore_to_briefing(payload: dict = Body(...)):
 # --- HISTORY ENDPOINTS ---
 # ==========================================
 @app.get("/history/list")
-def get_history_list(session_id: str = Query(None)):
-    files = glob.glob(os.path.join(HISTORY_DIR, "*.json"))
+def get_history_list(request: Request, session_id: str = Query(None)):
+    profile = get_active_profile_name(request)
+    files = get_profile_history_files(profile)
     files.sort(key=os.path.getmtime, reverse=True)
     file_list = []
     for f in files:
@@ -1507,30 +2168,31 @@ def get_history_list(session_id: str = Query(None)):
             if filename.startswith("briefing_"):
                 ts = filename.replace("briefing_", "").replace(".json", "")
                 display_date = datetime.datetime.strptime(ts, "%Y-%m-%d_%H-%M-%S").strftime("%b %d, %Y - %I:%M %p")
-                file_list.append({"filename": filename, "display": display_date, "type": "scheduler"})
+                file_list.append({"filename": filename, "display": display_date, "type": "scheduler", "profile": profile})
             elif filename.startswith("manual_"):
                 if not session_id: continue
                 expected_prefix = f"manual_{session_id}_"
                 if not filename.startswith(expected_prefix): continue
                 ts = filename.replace(expected_prefix, "").replace(".json", "")
                 display_date = datetime.datetime.strptime(ts, "%Y-%m-%d_%H-%M-%S").strftime("%b %d, %Y - %I:%M %p")
-                file_list.append({"filename": filename, "display": display_date, "type": "manual"})
+                file_list.append({"filename": filename, "display": display_date, "type": "manual", "profile": profile})
         except:
             pass
     return file_list
 
 
 @app.get("/history/range")
-def get_history_by_range(from_date: str, to_date: str, session_id: str = Query(None)):
+def get_history_by_range(request: Request, from_date: str, to_date: str, session_id: str = Query(None)):
+    profile = get_active_profile_name(request)
     try:
         start_date = datetime.datetime.strptime(from_date, "%Y-%m-%d").date()
         end_date = datetime.datetime.strptime(to_date, "%Y-%m-%d").date()
     except ValueError:
-        return {"status": "error", "message": "Invalid date format."}
+        return {"status": "error", "message": "Invalid date format.", "profile": profile}
 
     merged_results = []
     seen_titles = set()
-    files = glob.glob(os.path.join(HISTORY_DIR, "*.json"))
+    files = get_profile_history_files(profile)
     for f in files:
         filename = os.path.basename(f)
         try:
@@ -1551,7 +2213,7 @@ def get_history_by_range(from_date: str, to_date: str, session_id: str = Query(N
                 with open(f, "r", encoding="utf-8") as file_obj:
                     data = json.load(file_obj)
                     for item in data:
-                        item = apply_learned_region(item)
+                        item = apply_learned_region(item, profile)
                         title = item.get("title", "")
                         if title not in seen_titles:
                             seen_titles.add(title)
@@ -1560,47 +2222,93 @@ def get_history_by_range(from_date: str, to_date: str, session_id: str = Query(N
             continue
 
     merged_results.sort(key=lambda x: x.get("date", ""), reverse=True)
-    return {"status": "success", "count": len(merged_results), "results": merged_results}
+    return {"status": "success", "count": len(merged_results), "results": merged_results, "profile": profile}
 
 
 @app.get("/history/{filename}")
-def get_history_file(filename: str):
-    safe_name = sanitize_filename(filename)
-    file_path = os.path.join(HISTORY_DIR, safe_name)
-    if not os.path.exists(file_path):
+def get_history_file(request: Request, filename: str):
+    profile = get_active_profile_name(request)
+    file_path = resolve_profile_history_file(filename, profile)
+    if not file_path:
         raise HTTPException(status_code=404, detail="File not found")
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return {"status": "success", "results": apply_learned_regions(data)}
+        return {"status": "success", "results": apply_learned_regions(data, profile), "profile": profile}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+# ==========================================
+# VOC FEEDBACK STORE
+# ==========================================
+VOC_FEEDBACK_FILE = os.path.join(ROOT_DIR, "voc_feedback.json")
+
+
+@app.post("/voc")
+async def submit_voc_feedback(request: Request):
+    import uuid
+
+    payload = await request.json()
+    message = str(payload.get("message", "")).strip()
+    if not message:
+        return {"status": "error", "message": "Feedback message is required"}
+    items = []
+    if os.path.exists(VOC_FEEDBACK_FILE):
+        try:
+            with open(VOC_FEEDBACK_FILE, "r", encoding="utf-8") as f:
+                items = json.load(f)
+        except Exception:
+            items = []
+    profile = get_active_profile_name(request)
+    feedback_item = {
+        "id": str(uuid.uuid4()),
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "name": str(payload.get("name", "anonymous")).strip() or "anonymous",
+        "type": str(payload.get("type", "ui_feedback")).strip(),
+        "message": message,
+        "page": str(payload.get("page", "unknown")).strip(),
+        "profile": profile,
+        "client_host": request.client.host if request.client else None,
+    }
+    items.insert(0, feedback_item)
+    with open(VOC_FEEDBACK_FILE, "w", encoding="utf-8") as f:
+        json.dump(items[:500], f, indent=2, ensure_ascii=False)
+    return {"status": "success", "message": "Feedback saved", "item": feedback_item}
 
 
 # ==========================================
 # --- TRAINING ENDPOINTS ---
 # ==========================================
 @app.post("/train")
-def save_training_data(data: VotePayload, background_tasks: BackgroundTasks):
-    total = save_training_vote(data.keywords, data.summary, data.vote)
-    print(f"Feedback recorded: {data.vote}. Triggering AI evolution...")
-    background_tasks.add_task(retrain_and_reload)
-    return {"status": "success", "total_samples": total}
+def save_training_data(request: Request, data: VotePayload, background_tasks: BackgroundTasks):
+    profile = get_active_profile_name(request)
+    total = save_training_vote(data.keywords, data.summary, data.vote, data.title or "", profile)
+    background_tasks.add_task(retrain_and_reload, profile)
+    return {"status": "success", "total_samples": total, "profile": profile, "retrain_scheduled": True}
 
 
 # ==========================================
 # --- NOT INTERESTED ENDPOINTS ---
 # ==========================================
 @app.post("/not-interested")
-def add_not_interested(payload: dict = Body(...), background_tasks: BackgroundTasks = None):
+def add_not_interested(request: Request, background_tasks: BackgroundTasks, payload: dict = Body(...)):
+    profile = get_active_profile_name(request)
     title = payload.get("title", "")
-    summary = payload.get("master_summary", payload.get("summary", ""))
+    summary = (
+        payload.get("master_summary")
+        or payload.get("summary")
+        or payload.get("snippet")
+        or payload.get("full_content")
+        or payload.get("full_contents")
+        or ""
+    )
     keywords = payload.get("keywords_found", [])
 
     with not_interested_lock:
-        store = load_not_interested_store()
+        store = load_not_interested_store(request)
         if is_already_rejected(title, store):
-            return {"status": "exists", "message": "Already in Not Interested", "count": len(store)}
+            return {"status": "exists", "message": "Already in Not Interested", "count": len(store), "profile": profile}
 
         entry = {
             "title": title,
@@ -1622,32 +2330,33 @@ def add_not_interested(payload: dict = Body(...), background_tasks: BackgroundTa
             "first_seen": payload.get("first_seen", ""),
             "source_count": payload.get("source_count", 1),
             "entities": payload.get("entities", {}),
+            "profile": profile,
             "rejected_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "rejected_by": payload.get("rejected_by", "unknown"),
         }
         store.append(entry)
-        save_not_interested_store(store)
+        save_not_interested_store(store, request)
 
-    save_training_vote(keywords, summary, "not_interested")
-    print(f"Not-interested: {title[:60]}. Triggering AI evolution...")
-    if background_tasks:
-        background_tasks.add_task(retrain_and_reload)
+    save_training_vote(keywords, summary, "not_interested", title, profile)
+    background_tasks.add_task(retrain_and_reload, profile)
 
-    return {"status": "success", "message": "Moved to Not Interested", "count": len(store)}
+    return {"status": "success", "message": "Moved to Not Interested", "count": len(store), "profile": profile, "retrain_scheduled": True}
 
 
 @app.get("/not-interested")
-def get_not_interested():
-    store = load_not_interested_store()
-    return {"status": "success", "items": apply_learned_regions(store), "count": len(store), "expiry_hours": NOT_INTERESTED_EXPIRY_HOURS}
+def get_not_interested(request: Request):
+    profile = get_active_profile_name(request)
+    store = load_not_interested_store(request)
+    return {"status": "success", "items": apply_learned_regions(store, profile), "count": len(store), "expiry_hours": NOT_INTERESTED_EXPIRY_HOURS, "profile": profile}
 
 
 @app.post("/not-interested/restore")
-def restore_from_not_interested(payload: dict = Body(...), background_tasks: BackgroundTasks = None):
+def restore_from_not_interested(request: Request, background_tasks: BackgroundTasks, payload: dict = Body(...)):
+    profile = get_active_profile_name(request)
     title = payload.get("title", "")
 
     with not_interested_lock:
-        store = load_not_interested_store()
+        store = load_not_interested_store(request)
         article_to_restore = None
         remaining = []
         for item in store:
@@ -1657,21 +2366,21 @@ def restore_from_not_interested(payload: dict = Body(...), background_tasks: Bac
                 remaining.append(item)
 
         if not article_to_restore:
-            return {"status": "error", "message": "Article not found in Not Interested"}
-        save_not_interested_store(remaining)
+            return {"status": "error", "message": "Article not found in Not Interested", "profile": profile}
+        save_not_interested_store(remaining, request)
 
     summary = article_to_restore.get("master_summary", "")
     keywords = article_to_restore.get("keywords_found", [])
-    save_training_vote(keywords, summary, "interested")
+    save_training_vote(keywords, summary, "interested", article_to_restore.get("title", ""), profile)
 
     print(f"Restored: {title[:60]}. Counter-vote saved. Triggering retrain...")
-    if background_tasks:
-        background_tasks.add_task(retrain_and_reload)
+    background_tasks.add_task(retrain_and_reload, profile)
 
     article_to_restore.pop("rejected_at", None)
     article_to_restore.pop("rejected_by", None)
 
-    return {"status": "success", "message": "Restored to main feed", "article": article_to_restore, "count": len(remaining)}
+    article_to_restore = apply_learned_region(article_to_restore, profile)
+    return {"status": "success", "message": "Restored to main feed", "article": article_to_restore, "count": len(remaining), "profile": profile, "retrain_scheduled": True}
 
 
 # ==========================================
@@ -1679,14 +2388,9 @@ def restore_from_not_interested(payload: dict = Body(...), background_tasks: Bac
 # ==========================================
 @app.post("/track")
 def track_activity(payload: dict = Body(...), request: Request = None):
-    ip = "unknown"
-    if request:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            ip = forwarded.split(",")[0].strip()
-        else:
-            ip = request.client.host if request.client else "unknown"
-
+    ip = get_client_ip(request)
+    profile = get_active_profile_name(request)
+    team_owner = get_team_owner_for_ip(ip)
     fingerprint = payload.get("fingerprint", "unknown")
     action = payload.get("action", "")
     detail = payload.get("detail", "")
@@ -1704,6 +2408,9 @@ def track_activity(payload: dict = Body(...), request: Request = None):
             tracker[device_id] = {
                 "ip": ip,
                 "fingerprint": fingerprint,
+                "profile": profile,
+                "owner": team_owner or "Unknown",
+                "known_team_member": bool(team_owner),
                 "first_seen": today,
                 "last_seen": today,
                 "activity": {},
@@ -1712,6 +2419,9 @@ def track_activity(payload: dict = Body(...), request: Request = None):
         device = tracker[device_id]
         device["last_seen"] = today
         device["ip"] = ip
+        device["profile"] = profile
+        device["owner"] = team_owner or "Unknown"
+        device["known_team_member"] = bool(team_owner)
 
         if today not in device.get("activity", {}):
             device["activity"][today] = get_empty_day()
@@ -1739,10 +2449,22 @@ def track_activity(payload: dict = Body(...), request: Request = None):
     return {"status": "ok"}
 
 
+@app.get("/analytics/access")
+def get_analytics_access(request: Request):
+    ip = get_client_ip(request)
+    allowed = is_analytics_allowed_ip(ip)
+
+    return {
+        "allowed": allowed,
+        "ip": ip,
+        "owner": get_team_owner_for_ip(ip) or "Unknown",
+        "known_team_member": bool(get_team_owner_for_ip(ip)),
+    }
+
+
 @app.get("/analytics")
-def get_analytics(key: str = Query(None)):
-    if key != DIRECTOR_KEY:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+def get_analytics(request: Request, key: str = Query(None)):
+    ip = require_analytics_access(request, key)
 
     tracker = load_tracker()
     today = get_today()
@@ -1765,6 +2487,9 @@ def get_analytics(key: str = Query(None)):
         summary.append({
             "device_id": device_id,
             "ip": device.get("ip", "unknown"),
+            "owner": get_team_owner_for_ip(device.get("ip")) or device.get("owner", "Unknown"),
+            "known_team_member": bool(get_team_owner_for_ip(device.get("ip"))),
+            "profile": device.get("profile", DEFAULT_PROFILE),
             "first_seen": device.get("first_seen", ""),
             "last_seen": device.get("last_seen", ""),
             "active_days": active_days,
@@ -1783,7 +2508,20 @@ def get_analytics(key: str = Query(None)):
         })
 
     summary.sort(key=lambda x: x["engagement_score"])
-    return {"status": "success", "device_count": len(summary), "date": today, "devices": summary}
+    known_count = sum(1 for device in summary if device.get("known_team_member"))
+    return {
+        "status": "success",
+        "device_count": len(summary),
+        "known_team_member_count": known_count,
+        "unknown_device_count": len(summary) - known_count,
+        "date": today,
+        "viewer": {
+            "ip": ip,
+            "owner": get_team_owner_for_ip(ip) or "Unknown",
+        },
+        "team_ip_map": TEAM_IP_MAP,
+        "devices": summary,
+    }
 
 
 # ==========================================
@@ -1791,33 +2529,46 @@ def get_analytics(key: str = Query(None)):
 # ==========================================
 @app.get("/crawl")
 async def crawl(
+    request: Request,
     keywords: str = Query(None),
     from_date: str = Query(None),
     to_date: str = Query(None),
     target_sites: str = Query("All"),
     session_id: str = Query(None),
 ):
+    profile = get_profile_for_request(request)
+    sites_file = get_sites_file_for_profile(profile)
     job_id = secrets.token_hex(8)
-    root_dir = os.getcwd()
-    output_file = os.path.join(root_dir, f"ui_results_{job_id}.json")
-    cluster_file = os.path.join(root_dir, f"clustered_results_{job_id}.json")
+    output_file = os.path.join(ROOT_DIR, f"ui_results_{job_id}.json")
+    cluster_file = os.path.join(ROOT_DIR, f"clustered_results_{job_id}.json")
 
-    active_jobs[job_id] = {
-        "status": "running",
-        "keywords": keywords,
-        "started_at": datetime.datetime.now().isoformat(),
-    }
+    with scheduler_lock:
+        blocked_by_scheduler = SCHEDULER_STATUS["is_active"]
+        active_jobs[job_id] = {
+            "status": "blocked" if blocked_by_scheduler else "queued",
+            "keywords": keywords,
+            "started_at": datetime.datetime.now().isoformat(),
+            "profile": profile,
+        }
 
     def event_stream():
+        if blocked_by_scheduler:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'The scheduled briefing is running now. Please start the deep scan again when it completes.'})}\n\n"
+            return
+
         if not crawl_semaphore.acquire(blocking=False):
             yield f"data: {json.dumps({'type': 'error', 'message': 'Server is at capacity. Please wait a moment and try again.'})}\n\n"
-            active_jobs[job_id]["status"] = "error"
+            with scheduler_lock:
+                active_jobs[job_id]["status"] = "error"
             return
 
         process = None
 
         try:
-            yield f"data: {json.dumps({'type': 'job_started', 'job_id': job_id})}\n\n"
+            with scheduler_lock:
+                active_jobs[job_id]["status"] = "running"
+            yield f"data: {json.dumps({'type': 'job_started', 'job_id': job_id, 'profile': profile})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'message': f'Using {profile} profile'})}\n\n"
             yield f"data: {json.dumps({'type': 'status', 'message': 'Deploying Spider...'})}\n\n"
 
             cmd = [
@@ -1826,13 +2577,14 @@ async def crawl(
                 "-a", f"from_date={from_date}",
                 "-a", f"to_date={to_date}",
                 "-a", f"target_sites={target_sites}",
+                "-a", f"sites_file={sites_file}",
                 "-s", "ROBOTSTXT_OBEY=False",
                 "-s", "USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "-s", "DNS_RESOLVER=scrapy.resolver.CachingThreadedResolver",
                 "-s", "TWISTED_REACTOR=twisted.internet.asyncioreactor.AsyncioSelectorReactor",
                 "-O", output_file,
             ]
-            spider_cwd = os.path.join(root_dir, "news_aggregator")
+            spider_cwd = os.path.join(ROOT_DIR, "news_aggregator")
 
             process = subprocess.Popen(
                 cmd, cwd=spider_cwd,
@@ -1865,27 +2617,15 @@ async def crawl(
                     with open(output_file, "r", encoding="utf-8") as f:
                         raw_data = json.load(f)
 
-                    filtered_data = []
-                    dropped_count = 0
-
-                    for item in raw_data:
-                        title = item.get("title", "")
-                        summary = item.get("snippet", item.get("summary", ""))
-                        keywords_found = item.get("keywords_found", [])
-
-                        if bouncer_check(title, summary, keywords_found):
-                            filtered_data.append(item)
-                        else:
-                            dropped_count += 1
-                            print(f"Dropped: {title}", flush=True)
-                            yield f"data: {json.dumps({'type': 'status', 'message': f'Dropped: {title[:60]}'})}\n\n"
-                            log_dropped_article(title, summary, keywords_found)
+                    filtered_data, dropped_count, low_priority_count = run_bouncer_filter_on_items(
+                        raw_data, profile, "manual_raw"
+                    )
 
                     with open(output_file, "w", encoding="utf-8") as f:
-                        json.dump(filtered_data, f, indent=4)
+                        json.dump(filtered_data, f, indent=4, ensure_ascii=False)
 
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'Gatekeeper done. Removed {dropped_count} articles.'})}\n\n"
-                    print(f"Bouncer complete. Dropped {dropped_count} articles.", flush=True)
+                    yield f"data: {json.dumps({'type': 'status', 'message': f'Gatekeeper done. Removed {dropped_count} articles. Low priority kept: {low_priority_count}.'})}\n\n"
+                    print(f"Bouncer complete [{profile}]. Dropped {dropped_count} articles.", flush=True)
                 except Exception as e:
                     print(f"Bouncer error, skipping filter: {e}", flush=True)
 
@@ -1904,7 +2644,8 @@ async def crawl(
                         event.get("title", ""),
                         event.get("master_summary", "") or event.get("snippet", ""),
                     )
-                    event.update(apply_learned_region(event))
+                    event["profile"] = profile
+                    event.update(apply_learned_region(event, profile))
                     yield f"data: {json.dumps({'type': 'card', 'card': event}, ensure_ascii=False)}\n\n"
                     streamed_count += 1
 
@@ -1931,7 +2672,7 @@ async def crawl(
                 try:
                     fusion_fallback = subprocess.Popen(
                         [sys.executable, "-u", "semantic_clustering.py", "--job-id", job_id],
-                        cwd=root_dir,
+                        cwd=ROOT_DIR,
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, encoding="utf-8", errors="replace",
                         close_fds=CLOSE_FDS,
@@ -1960,12 +2701,16 @@ async def crawl(
                     results = json.load(f)
 
             if results:
+                results, final_dropped_count, final_low_priority_count = run_bouncer_filter_on_items(
+                    results, profile, "manual_final"
+                )
                 for r in results:
                     r["category"] = assign_category(
                         r.get("title", ""),
                         r.get("master_summary", "") or r.get("snippet", ""),
                     )
-                    r.update(apply_learned_region(r))
+                    r["profile"] = profile
+                    r.update(apply_learned_region(r, profile))
 
             # Archive
             if results:
@@ -1973,19 +2718,21 @@ async def crawl(
                 learner.log_search_data(keywords, results)
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 sid = session_id or "unknown"
-                manual_path = os.path.join(HISTORY_DIR, f"manual_{sid}_{timestamp}.json")
+                manual_path = os.path.join(get_profile_history_dir(profile), f"manual_{sid}_{timestamp}.json")
                 with open(manual_path, "w", encoding="utf-8") as f:
-                    json.dump(results, f, indent=4)
-                print(f"Archived: manual_{sid}_{timestamp}.json", flush=True)
+                    json.dump(results, f, indent=4, ensure_ascii=False)
+                print(f"Archived [{profile}]: manual_{sid}_{timestamp}.json", flush=True)
 
-            active_jobs[job_id]["status"] = "complete"
-            yield f"data: {json.dumps({'type': 'data', 'results': results, 'job_id': job_id, 'reclustered': True})}\n\n"
+            with scheduler_lock:
+                active_jobs[job_id]["status"] = "complete"
+            yield f"data: {json.dumps({'type': 'data', 'results': results, 'job_id': job_id, 'reclustered': True, 'profile': profile})}\n\n"
 
         finally:
             if process and process.poll() is None:
                 process.terminate()
             crawl_semaphore.release()
-            active_jobs[job_id]["status"] = "complete"
+            with scheduler_lock:
+                active_jobs[job_id]["status"] = "complete"
             threading.Timer(300, cleanup_job_files, args=[output_file, cluster_file]).start()
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
@@ -1998,7 +2745,8 @@ API_ROUTES = {
     "crawl", "train", "status", "briefing",
     "export-excel", "export-ppt", "export-word",
     "sites", "latest-briefing", "workflow",
-    "history", "not-interested", "region", "track", "analytics",
+    "history", "not-interested", "region", "track", "analytics", "profile", "voc",
+    "insight",
 }
 
 

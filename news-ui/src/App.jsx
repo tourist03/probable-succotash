@@ -18,6 +18,7 @@ import SchedulerScreen from './screens/SchedulerScreen.jsx';
 import HistoryScreen from './screens/HistoryScreen.jsx';
 import TrendsScreen from './screens/TrendsScreen.jsx';
 import VocScreen from './screens/VocScreen.jsx';
+import AnalyticsScreen from './screens/AnalyticsScreen.jsx';
 
 const SENSE_ATMOSPHERE_VIDEO = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4';
 
@@ -184,6 +185,7 @@ export default function App() {
             <Route path="/history" element={<HistoryScreen />} />
             <Route path="/trends" element={<TrendsScreen />} />
             <Route path="/voc" element={<VocScreen />} />
+            <Route path="/director-analytics" element={<AnalyticsScreen />} />
           </Routes>
         </main>
         <VocFeedback />

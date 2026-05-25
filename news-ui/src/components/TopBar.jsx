@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
-import { getStatus } from '../api.js';
+import { getAnalyticsAccess, getStatus } from '../api.js';
 
 const mainNav = [
   { to: '/scan', label: 'Deep Scan' },
@@ -9,7 +9,7 @@ const mainNav = [
   { to: '/approved', label: 'Approved Briefing' },
 ];
 
-const settingsNav = [
+const baseSettingsNav = [
   { to: '/home', label: 'Intelligence Briefing' },
   { to: '/history', label: 'Briefing Archive' },
   { to: '/rejected', label: 'Hidden Signals' },
@@ -19,11 +19,17 @@ const settingsNav = [
   { to: '/voc', label: 'Voice of Customer' },
 ];
 
+function isLocalDevHost() {
+  if (typeof window === 'undefined') return false;
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+}
+
 export default function TopBar({ manualScan }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState(localStorage.getItem('news-profile') || 'default');
   const [schedulerActive, setSchedulerActive] = useState(false);
+  const [analyticsAllowed, setAnalyticsAllowed] = useState(isLocalDevHost());
 
   useEffect(() => {
     const onProfile = () => setProfile(localStorage.getItem('news-profile') || 'default');
@@ -56,12 +62,31 @@ export default function TopBar({ manualScan }) {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    getAnalyticsAccess()
+      .then((result) => {
+        if (!cancelled) setAnalyticsAllowed(Boolean(result?.allowed) || isLocalDevHost());
+      })
+      .catch(() => {
+        if (!cancelled) setAnalyticsAllowed(isLocalDevHost());
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const isBroadcast = profile === 'broadcast';
+  const settingsNav = analyticsAllowed
+    ? [...baseSettingsNav, { to: '/director-analytics', label: 'Analytics' }]
+    : baseSettingsNav;
 
   return (
-    <header className={`design-header ${isBroadcast ? 'is-broadcast' : 'is-default'} fixed left-0 top-0 z-40 w-[1920px] border-b border-white/10 bg-[#0b1322]/90 backdrop-blur-xl`}>
+    <header className={`design-header ${isBroadcast ? 'is-broadcast' : 'is-default'} fixed left-0 top-0 z-40 w-[1920px]`}>
       <div className="command-header-inner flex h-[82px] items-center gap-8 px-12">
-        <div className="brand-status group relative min-w-[320px]">
+        <div className="brand-status header-brand group relative">
           <button
             className="flex items-center gap-4 text-left"
             onClick={() => navigate('/home')}
@@ -69,21 +94,25 @@ export default function TopBar({ manualScan }) {
             type="button"
           >
             <span className={[
-              'app-logo flex h-12 w-12 items-center justify-center rounded-2xl border text-sm font-semibold shadow-glow',
+              'app-logo flex h-12 w-12 items-center justify-center rounded-2xl border shadow-glow',
               isBroadcast
                 ? 'border-amber-300/25 bg-amber-400/10 text-amber-200'
                 : 'border-sky-300/25 bg-sky-400/10 text-sky-200',
               schedulerActive ? (isBroadcast ? 'scheduler-glow is-broadcast' : 'scheduler-glow') : '',
             ].join(' ')}
             >
-              NS
+              <span className="sense-lens-mark" aria-hidden="true">
+                <span className="sense-lens-ring" />
+                <span className="sense-lens-core" />
+                <span className="sense-lens-ray" />
+              </span>
             </span>
             <span>
               <span className="block text-lg font-semibold text-white">
-                NewsScrapper Intelligence
+                NewsScrapper
               </span>
               <span className="flex items-center gap-2 text-[11px] uppercase tracking-[0.26em] text-slate-400">
-                Sense.AI / Intelligence Briefing
+                Sense.AI / Signal Desk
                 {schedulerActive && <span className="scheduler-live-dot" aria-hidden="true" />}
               </span>
             </span>
@@ -128,7 +157,7 @@ export default function TopBar({ manualScan }) {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="header-actions flex items-center gap-3">
           <span className={isBroadcast
             ? 'inline-flex rounded-full border border-amber-300/25 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-100'
             : 'inline-flex rounded-full border border-sky-300/20 bg-sky-400/10 px-4 py-2 text-xs font-semibold text-sky-100'}

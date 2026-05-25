@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Indian Broadcasting World",
+    "url": "https://www.indianbroadcastingworld.com/",
+    "category": "Broadcast / DTH / Cable",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "BestMediaInfo",
+    "url": "https://bestmediainfo.com/",
+    "category": "Media / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Exchange4Media",
+    "url": "https://www.exchange4media.com/",
+    "category": "Media / Advertising / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Storyboard18",
+    "url": "https://www.storyboard18.com/",
+    "category": "Media / Advertising / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true
+  }
+]

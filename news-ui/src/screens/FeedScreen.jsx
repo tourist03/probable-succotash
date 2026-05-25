@@ -521,7 +521,7 @@ export default function FeedScreen() {
         setArticles((arr) => arr.filter((a) => a.id !== item.id));
         setHiddenCount((n) => n + 1);
       } else if (v === 'up') {
-        await trainVote(item.keywords?.join(',') || '', item.summary || item.title, 'up');
+        await trainVote(item.keywords?.join(',') || '', item.summary || item.title, 'up', item.title);
       }
     } catch {
       /* keep UI optimistic */

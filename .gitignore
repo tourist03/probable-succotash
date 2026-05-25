@@ -31,17 +31,26 @@ local_bart_model/
 local_miniLM_model/
 semantic_model/
 bouncer_model.pkl
+bouncer_model_broadcast.pkl
 
 # Runtime state, collected data, and user activity exports
 history_archive/
+intelligence_store/
 dropped_articles.json
 not_interested_store.json
+not_interested_store_broadcast.json
 seen_registry.json
 usage_tracker.json
 workflow_store.json
+workflow_store_broadcast.json
 manual_search_logs.xlsx
 trainingData.json
+trainingData_broadcast.json
 training_dataset.csv
+region_learning*.json
+voc_feedback.json
+ui_results*.json
+clustered_results*.json
 
 # Local archives and extracted working copies
 *.zip

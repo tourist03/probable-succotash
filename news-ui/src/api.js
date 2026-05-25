@@ -3,10 +3,19 @@ import { getSessionId } from './utils/session.js';
 
 const BASE = import.meta.env.VITE_API_BASE || '';
 
+function selectedProfile() {
+  if (typeof window === 'undefined') return 'default';
+  return localStorage.getItem('news-profile') === 'broadcast' ? 'broadcast' : 'default';
+}
+
 async function jsonFetch(url, opts = {}) {
   const res = await fetch(BASE + url, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Sense-Profile': selectedProfile(),
+      ...(opts.headers || {}),
+    },
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -21,6 +30,7 @@ export const getLatestBriefing = () => jsonFetch('/latest-briefing');
 export const getBriefingMeta   = () => jsonFetch('/briefing/meta');
 export const removeFromBriefing  = (title)   => jsonFetch('/briefing/remove',  { method:'POST', body: JSON.stringify({ title }) });
 export const restoreToBriefing   = (article) => jsonFetch('/briefing/restore', { method:'POST', body: JSON.stringify({ article }) });
+export const getInsight = (article) => jsonFetch('/insight', { method:'POST', body: JSON.stringify(article) });
 
 // ---------- Crawl (SSE) ----------
 export function streamCrawl(params, onEvent) {
@@ -30,6 +40,7 @@ export function streamCrawl(params, onEvent) {
   if (params.to_date)      u.set('to_date', params.to_date);
   if (params.target_sites) u.set('target_sites', params.target_sites);
   u.set('session_id', params.session_id || getSessionId());
+  u.set('profile', selectedProfile());
   const url = `${BASE}/crawl?${u.toString()}`;
   const es = new EventSource(url);
 
@@ -52,8 +63,8 @@ export function streamCrawl(params, onEvent) {
 }
 
 // ---------- Train / votes ----------
-export const trainVote = (keywords, summary, vote) =>
-  jsonFetch('/train', { method:'POST', body: JSON.stringify({ keywords, summary, vote }) });
+export const trainVote = (keywords, summary, vote, title = '') =>
+  jsonFetch('/train', { method:'POST', body: JSON.stringify({ keywords, summary, vote, title }) });
 export const correctRegion = (article, region, keywords, reason) =>
   jsonFetch('/region/correct', {
     method: 'POST',
@@ -120,11 +131,21 @@ export const trackEvent = (fingerprint, action, detail) =>
 // ---------- Status ----------
 export const getStatus = () => jsonFetch('/status');
 
+// ---------- Analytics ----------
+export const getAnalyticsAccess = () => jsonFetch('/analytics/access');
+export const getAnalytics = (key) => {
+  const u = new URLSearchParams({ key });
+  return jsonFetch('/analytics?' + u.toString());
+};
+
 // ---------- Exports (binary) ----------
 async function exportBinary(path, items, filename) {
   const res = await fetch(BASE + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Sense-Profile': selectedProfile(),
+    },
     body: JSON.stringify({ items, filename }),
   });
   if (!res.ok) throw new Error(`Export failed: ${res.status}`);

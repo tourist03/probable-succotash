@@ -9,6 +9,7 @@ import scrapy
 import urllib3
 from dateutil import parser
 from newspaper import Article, Config
+from scrapy.http import TextResponse
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -68,6 +69,8 @@ class NewsSpider(scrapy.Spider):
             for keyword in self.keywords
         ]
         self.target_sites = getattr(self, "target_sites", "All")
+        configured_sites_file = getattr(self, "sites_file", "")
+        self.sites_file = os.path.abspath(configured_sites_file) if configured_sites_file else None
         self.start_date = self.parse_filter_date(getattr(self, "from_date", None))
         self.end_date = self.parse_filter_date(getattr(self, "to_date", None))
         self.seen_article_urls = set()
@@ -83,17 +86,19 @@ class NewsSpider(scrapy.Spider):
         yield from self.build_initial_requests()
 
     def build_initial_requests(self):
-        sites_path = os.path.abspath(os.path.join(os.getcwd(), "..", "sites.json"))
+        sites_path = self.sites_file
+        if not sites_path:
+            sites_path = os.path.abspath(os.path.join(os.getcwd(), "..", "sites.json"))
         if not os.path.exists(sites_path):
             sites_path = os.path.join(os.getcwd(), "sites.json")
         if not os.path.exists(sites_path):
-            print("LOG: Error - sites.json not found.", flush=True)
+            print(f"LOG: Error - sites file not found: {sites_path}", flush=True)
             return
 
         with open(sites_path, "r", encoding="utf-8") as f:
             sites = json.load(f)
 
-        active_sites = sites
+        active_sites = [site for site in sites if site.get("enabled", True)]
         if self.target_sites != "All":
             target_list = [name.strip().lower() for name in self.target_sites.split(",")]
             active_sites = [
@@ -149,6 +154,9 @@ class NewsSpider(scrapy.Spider):
         return True
 
     def parse_source_response(self, response):
+        if not isinstance(response, TextResponse):
+            print(f"LOG: Skipped non-text source response: {response.url[:65]}", flush=True)
+            return
         if self.looks_like_feed(response):
             yield from self.parse_feed(response)
             return
@@ -351,6 +359,9 @@ class NewsSpider(scrapy.Spider):
     def parse_article_page(self, response):
         seed_title = response.meta.get("seed_title", "")
         site_name = response.meta["site_name"]
+        if not isinstance(response, TextResponse):
+            print(f"LOG: Skipped non-text article from {site_name}: {response.url[:65]}", flush=True)
+            return
         article = None
         try:
             article = Article(response.url, config=self.news_config)

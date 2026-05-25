@@ -6,7 +6,7 @@ const BACKEND = 'http://127.0.0.1:8000';
 const proxyPaths = [
   '/crawl', '/latest-briefing', '/briefing', '/train',
   '/not-interested', '/workflow', '/sites', '/history/',
-  '/track', '/status', '/analytics',
+  '/track', '/status', '/analytics', '/profile', '/region', '/voc', '/insight',
   '/export-ppt', '/export-excel', '/export-word', '/assets',
 ];
 
