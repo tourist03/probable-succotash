@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
-import { getAnalyticsAccess, getStatus } from '../api.js';
+import { getAnalyticsAccess } from '../api.js';
 
 const mainNav = [
   { to: '/scan', label: 'Deep Scan' },
@@ -28,7 +28,6 @@ export default function TopBar({ manualScan }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState(localStorage.getItem('news-profile') || 'default');
-  const [schedulerActive, setSchedulerActive] = useState(false);
   const [analyticsAllowed, setAnalyticsAllowed] = useState(isLocalDevHost());
 
   useEffect(() => {
@@ -38,27 +37,6 @@ export default function TopBar({ manualScan }) {
     return () => {
       window.removeEventListener('news-profile-change', onProfile);
       window.removeEventListener('storage', onProfile);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const refreshStatus = async () => {
-      try {
-        const status = await getStatus();
-        if (!cancelled) setSchedulerActive(Boolean(status?.is_active));
-      } catch {
-        if (!cancelled) setSchedulerActive(false);
-      }
-    };
-
-    refreshStatus();
-    const timer = window.setInterval(refreshStatus, 10_000);
-    window.addEventListener('focus', refreshStatus);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      window.removeEventListener('focus', refreshStatus);
     };
   }, []);
 
@@ -84,59 +62,21 @@ export default function TopBar({ manualScan }) {
     : baseSettingsNav;
 
   return (
-    <header className={`design-header ${isBroadcast ? 'is-broadcast' : 'is-default'} fixed left-0 top-0 z-40 w-[1920px]`}>
-      <div className="command-header-inner flex h-[82px] items-center gap-8 px-12">
-        <div className="brand-status header-brand group relative">
+    <header className={`design-header ${isBroadcast ? 'is-broadcast' : 'is-default'} fixed inset-x-0 top-0 z-40 w-full`}>
+      <div className="command-header-inner flex items-center">
+        <div className="header-identity flex items-center">
           <button
-            className="flex items-center gap-4 text-left"
+            className="news-wordmark"
             onClick={() => navigate('/home')}
-            aria-describedby={schedulerActive ? 'scheduler-live-tooltip' : undefined}
             type="button"
           >
-            <span className={[
-              'app-logo flex h-12 w-12 items-center justify-center rounded-2xl border shadow-glow',
-              isBroadcast
-                ? 'border-amber-300/25 bg-amber-400/10 text-amber-200'
-                : 'border-sky-300/25 bg-sky-400/10 text-sky-200',
-              schedulerActive ? (isBroadcast ? 'scheduler-glow is-broadcast' : 'scheduler-glow') : '',
-            ].join(' ')}
-            >
-              <span className="sense-lens-mark" aria-hidden="true">
-                <span className="sense-lens-ring" />
-                <span className="sense-lens-core" />
-                <span className="sense-lens-ray" />
-              </span>
-            </span>
-            <span>
-              <span className="block text-lg font-semibold text-white">
-                NewsScrapper
-              </span>
-              <span className="flex items-center gap-2 text-[11px] uppercase tracking-[0.26em] text-slate-400">
-                Sense.AI / Signal Desk
-                {schedulerActive && <span className="scheduler-live-dot" aria-hidden="true" />}
-              </span>
-            </span>
+            <span className="news-word">News</span>
+            <span className="scrapper-word">Scrapper</span>
           </button>
-          {schedulerActive && (
-            <div id="scheduler-live-tooltip" className="scheduler-tooltip" role="status">
-              <span className="scheduler-live-dot" aria-hidden="true" />
-              <span>
-                <strong>Scheduler scan active</strong>
-                <small>Fresh briefing data is being prepared.</small>
-              </span>
-            </div>
-          )}
+          <span className="profile-badge">
+            {isBroadcast ? 'Broadcast Intelligence' : 'Default Intelligence'}
+          </span>
         </div>
-
-        {manualScan?.running && (
-          <button className="manual-scan-live" onClick={() => navigate('/scan')} type="button">
-            <span className="scheduler-live-dot" aria-hidden="true" />
-            <span>
-              <strong>Deep Scan running</strong>
-              <small>Results continue in this session</small>
-            </span>
-          </button>
-        )}
 
         <nav className="command-nav ml-auto flex items-center gap-1">
           {mainNav.map((item) => (
@@ -145,28 +85,23 @@ export default function TopBar({ manualScan }) {
               to={item.to}
               className={({ isActive }) =>
                 [
-                  'rounded-xl px-6 py-3 text-sm font-semibold transition',
-                  isActive
-                    ? 'bg-sky-400/12 text-sky-100 ring-1 ring-sky-300/25'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
+                  'command-nav-link',
+                  isActive ? 'active' : '',
                 ].join(' ')
               }
             >
               {item.label}
+              {item.to === '/scan' && manualScan?.running && (
+                <span className="deep-scan-dot" aria-label="Deep Scan running" />
+              )}
             </NavLink>
           ))}
         </nav>
 
-        <div className="header-actions flex items-center gap-3">
-          <span className={isBroadcast
-            ? 'inline-flex rounded-full border border-amber-300/25 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-100'
-            : 'inline-flex rounded-full border border-sky-300/20 bg-sky-400/10 px-4 py-2 text-xs font-semibold text-sky-100'}
-          >
-            {isBroadcast ? 'Broadcast Intelligence' : 'Default Intelligence'}
-          </span>
+        <div className="header-actions">
           <div className="relative">
             <button
-              className="command-settings-trigger flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-sky-300/30 hover:text-white"
+              className="command-settings-trigger"
               onClick={() => setOpen((v) => !v)}
               title="Settings"
               type="button"
@@ -189,6 +124,24 @@ export default function TopBar({ manualScan }) {
                     <Icon name="chevR" size={14} />
                   </button>
                 ))}
+                <div className="settings-language-divider" aria-hidden="true" />
+                <button
+                  aria-label="English to Korean translation, coming soon in beta"
+                  className="settings-language-preview"
+                  title="Korean interface translation is coming soon"
+                  type="button"
+                >
+                  <span className="settings-language-orbit" aria-hidden="true">
+                    <Icon name="refresh" size={18} />
+                  </span>
+                  <span className="settings-language-copy">
+                    <span className="settings-language-title">
+                      English <span aria-hidden="true">-&gt;</span> 한국어
+                    </span>
+                    <span className="settings-language-note">Interface translation</span>
+                  </span>
+                  <span className="settings-language-beta">Beta soon</span>
+                </button>
               </div>
             )}
           </div>

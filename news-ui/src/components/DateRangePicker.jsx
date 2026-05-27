@@ -28,6 +28,8 @@ export default function DateRangePicker({
   to,
   onChange,
   label = 'Date Range',
+  helpText = '',
+  onHelp,
   shortcuts = true,
 }) {
   const [open, setOpen] = useState(false);
@@ -99,7 +101,20 @@ export default function DateRangePicker({
 
   return (
     <div className="relative">
-      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</span>
+      <div className="scan-field-label">
+        <span>{label}</span>
+        {helpText && (
+          <button
+            className="scan-field-help"
+            title={helpText}
+            aria-label="Help: date range"
+            onClick={onHelp}
+            type="button"
+          >
+            ?
+          </button>
+        )}
+      </div>
       <button
         ref={triggerRef}
         className="date-range-trigger dark-input flex items-center justify-between gap-3 text-left"

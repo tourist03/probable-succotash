@@ -26,6 +26,7 @@ It is written for a completely new person who has never seen the codebase.
 18. Hard-Coded Knobs and Where To Change Them
 19. Common Operations
 20. Known Risks and Future Improvements
+21. Korean Language Interface Roadmap
 
 ---
 
@@ -1336,6 +1337,55 @@ news-ui/dist/assets/*
 6. Add separate deployment profiles for dev/staging/prod.
 7. Add health checks for each source feed.
 8. Add model warmup and memory monitoring.
+
+---
+
+## 21. Korean Language Interface Roadmap
+
+### Current State
+
+The Settings menu exposes a designed preview item labelled `English -> 한국어` with a `Beta soon` tag. It is deliberately not a functioning switch yet. Nothing in the API payloads, scraped news content, bouncer training records, stored archives, or export files is translated by that preview control.
+
+That boundary is important: translated navigation is a user-interface concern, while retrieved headlines and summaries are intelligence evidence and should not be silently altered.
+
+### High-Level Delivery Phases
+
+```mermaid
+flowchart LR
+    Preview["Phase 0: Settings preview"] --> Catalog["Phase 1: UI string catalog"]
+    Catalog --> Toggle["Phase 2: English / Korean switch"]
+    Toggle --> Locale["Phase 3: locale-aware dates, labels, and exports"]
+    Locale --> Content["Phase 4: optional article translation"]
+```
+
+| Phase | Outcome | Main Boundary |
+|---|---|---|
+| Phase 0 | Visible beta teaser in Settings | No translation behavior or stored-state change. |
+| Phase 1 | Centralize fixed React labels into English and Korean dictionaries | Replace hard-coded UI copy only; backend contract stays stable. |
+| Phase 2 | Enable a persisted language toggle | Store user locale in browser preference or authenticated user settings; profile routing remains separate. |
+| Phase 3 | Localize dates, validation messages, dossier labels, and generated export chrome | Preserve original article title, source, URL, and archive fields. |
+| Phase 4 | Offer optional machine translation of article summaries or dossier insight | Retain original text alongside translated text and clearly label translated content. |
+
+### Recommended Architecture
+
+Keep language independent from intelligence profile:
+
+- `default` and `broadcast` decide sources, keywords, history, and bouncer model.
+- `en` and `ko` decide interface labels and presentation formatting.
+- A Korean user can use either intelligence profile without changing retrieval behavior.
+
+The practical implementation starts in the React application with a small localization provider and string catalogs. Backend localization should be added later only for generated presentation text or optional translated summaries, never by overwriting source-grounded article content.
+
+### What Will Eventually Change
+
+| Area | Proposed Change |
+|---|---|
+| Settings menu | Activate the preview row as an English / Korean toggle. |
+| React screens and modal | Replace visible fixed copy with locale keys. |
+| Browser storage | Persist the selected locale independently of `news-profile`. |
+| FastAPI responses | Continue returning canonical stored content; add translated fields only where explicitly requested. |
+| Models | Bouncer and semantic clustering should continue using canonical/original content unless a separate multilingual evaluation proves a change beneficial. |
+| Exports | Add locale selection to UI-generated section labels while retaining original source titles and links. |
 
 ---
 

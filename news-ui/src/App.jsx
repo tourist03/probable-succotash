@@ -158,10 +158,10 @@ export default function App() {
 
   return (
     <DesignViewport>
-      <div className="app-shell min-h-[1080px] text-slate-100">
+      <div className="app-shell min-h-screen text-slate-100">
         <ProductAtmosphere live={pathname === '/home'} />
         <TopBar manualScan={manualScan} />
-        <main className="design-main mx-auto w-full px-12 pb-20 pt-[112px]">
+        <main className="design-main mx-auto w-full">
           <Routes>
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<FeedScreen />} />

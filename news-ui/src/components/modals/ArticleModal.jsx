@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../Icon.jsx';
 import Bouncer from '../Bouncer.jsx';
 import { getInsight } from '../../api.js';
@@ -224,13 +225,23 @@ export default function ArticleModal({
     };
   }, [item?.id, item?.title, item?.summary, item?.why_matters]);
 
+  useEffect(() => {
+    if (!item) return undefined;
+
+    document.body.classList.add('dossier-open');
+
+    return () => {
+      document.body.classList.remove('dossier-open');
+    };
+  }, [item]);
+
   if (!item) return null;
 
   const score = scoreOf(item);
   const sources = sourceList(item);
   const visibleSources = expanded ? sources : sources.slice(0, 5);
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal dossier" onClick={(e) => e.stopPropagation()}>
         <div className="head dossier-head">
@@ -341,6 +352,7 @@ export default function ArticleModal({
           </aside>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

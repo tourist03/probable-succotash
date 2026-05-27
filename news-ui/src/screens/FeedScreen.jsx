@@ -251,24 +251,38 @@ function BriefingStream({ articles, onOpen, navigate }) {
 
 function LatestDaySignals({ articles, onOpen }) {
   const [start, setStart] = useState(0);
+  const [paused, setPaused] = useState(false);
   const latest = latestDate(articles);
   const items = useMemo(
     () => sortByDate(articles.filter((item) => item.date === latest)),
     [articles, latest]
   );
-  const visible = items.slice(start, start + 5);
   const canMove = items.length > 5;
+  const visibleCount = Math.min(5, items.length);
+  const visible = canMove
+    ? Array.from({ length: visibleCount }, (_, offset) => items[(start + offset) % items.length])
+    : items.slice(0, visibleCount);
 
   useEffect(() => {
-    if (start > Math.max(0, items.length - 5)) setStart(Math.max(0, items.length - 5));
+    if (start >= items.length) setStart(0);
   }, [items.length, start]);
+
+  useEffect(() => {
+    if (!canMove || paused) return undefined;
+    const timer = setInterval(() => setStart((position) => (position + 1) % items.length), 30000);
+    return () => clearInterval(timer);
+  }, [canMove, items.length, paused]);
 
   if (!items.length) return null;
 
-  const move = (delta) => setStart((n) => Math.max(0, Math.min(items.length - 5, n + delta)));
+  const move = (delta) => setStart((position) => (position + delta + items.length) % items.length);
 
   return (
-    <section className="latest-day-stage rounded-[22px] border border-white/10 bg-[#101827]/80 p-4 shadow-cockpit 2xl:p-5">
+    <section
+      className="latest-day-stage rounded-[22px] border border-white/10 bg-[#101827]/80 p-4 shadow-cockpit 2xl:p-5"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
       <div className="mb-3 flex items-center justify-between gap-4">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Latest Day Signals</div>
@@ -276,10 +290,10 @@ function LatestDaySignals({ articles, onOpen }) {
         </div>
         {canMove && (
           <div className="flex gap-2">
-            <button className="carousel-control" onClick={() => move(-1)} disabled={start === 0} type="button" aria-label="Previous signals">
+            <button className="carousel-control" onClick={() => move(-1)} type="button" aria-label="Previous signals">
               <Icon name="chevL" />
             </button>
-            <button className="carousel-control" onClick={() => move(1)} disabled={start >= items.length - 5} type="button" aria-label="Next signals">
+            <button className="carousel-control" onClick={() => move(1)} type="button" aria-label="Next signals">
               <Icon name="chevR" />
             </button>
           </div>

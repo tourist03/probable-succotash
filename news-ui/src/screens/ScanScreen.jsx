@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
@@ -11,7 +11,30 @@ import { correctRegion, getSites, getNotInterested, rejectArticle, selectWorkflo
 import { trackAction } from '../utils/tracking.js';
 import { articleKey, cardVariant, groupedByDate, scoreOf } from '../utils/intelligence.js';
 
-const fmt = (d) => d.toISOString().slice(0, 10);
+const fmt = (date) => {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const DEEP_SCAN_TOUR_KEY = 'deep-scan-tour-complete';
+const DEEP_SCAN_TOUR_STEPS = [
+  {
+    title: 'Enter investigation keywords',
+    text: 'Add one or more subjects separated by commas, for example: Samsung, OLED, Nvidia, robotics. The search keeps stories that match at least one keyword.',
+  },
+  {
+    title: 'Start with today',
+    text: 'Deep Search now begins with today only. Open Date Range when you need older context or a wider investigation window.',
+  },
+  {
+    title: 'Choose the source scope',
+    text: 'All active sources are searched by default. Narrow this control when you want a targeted investigation by publication or category.',
+  },
+  {
+    title: 'Launch the investigation',
+    text: 'Run Deep Search crawls your selected sources for the keywords and time window, then streams and clusters the matching stories into this workspace.',
+  },
+];
 
 function sourceName(source) {
   return source?.name || source?.title || String(source);
@@ -206,6 +229,65 @@ function SourcePicker({ sites, selected, onApply }) {
   );
 }
 
+function DeepScanTour({ step, targetRef, onNext, onDismiss }) {
+  const [bounds, setBounds] = useState(null);
+  const guide = DEEP_SCAN_TOUR_STEPS[step];
+
+  useEffect(() => {
+    if (!guide) return undefined;
+
+    const updateBounds = () => {
+      const rect = targetRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setBounds({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        bottom: rect.bottom,
+      });
+    };
+
+    updateBounds();
+    window.addEventListener('resize', updateBounds);
+    window.addEventListener('scroll', updateBounds, true);
+    return () => {
+      window.removeEventListener('resize', updateBounds);
+      window.removeEventListener('scroll', updateBounds, true);
+    };
+  }, [guide, targetRef]);
+
+  if (!guide || !bounds) return null;
+
+  const popoverWidth = 372;
+  const left = Math.min(
+    Math.max(16, bounds.left),
+    Math.max(16, window.innerWidth - popoverWidth - 16),
+  );
+  const hasRoomBelow = bounds.bottom + 188 < window.innerHeight;
+  const top = hasRoomBelow ? bounds.bottom + 14 : Math.max(16, bounds.top - 178);
+  const isLast = step === DEEP_SCAN_TOUR_STEPS.length - 1;
+
+  return createPortal((
+    <>
+      <button className="scan-tour-scrim fixed inset-0" onClick={onDismiss} type="button" aria-label="Skip Deep Search guide" />
+      <div
+        className="scan-tour-spotlight fixed"
+        style={{ left: `${bounds.left - 5}px`, top: `${bounds.top - 5}px`, width: `${bounds.width + 10}px`, height: `${bounds.height + 10}px` }}
+      />
+      <aside className="scan-tour-card fixed" style={{ left: `${left}px`, top: `${top}px` }} aria-live="polite">
+        <div className="scan-tour-progress">Deep Search Guide · {step + 1} of {DEEP_SCAN_TOUR_STEPS.length}</div>
+        <h3>{guide.title}</h3>
+        <p>{guide.text}</p>
+        <div className="scan-tour-actions">
+          <button className="scan-tour-skip" onClick={onDismiss} type="button">Skip</button>
+          <button className="scan-tour-next" onClick={onNext} type="button">{isLast ? 'Got it' : 'Next'}</button>
+        </div>
+      </aside>
+    </>
+  ), document.body);
+}
+
 function ScanActivityPanel({ running, logs, hasBatch }) {
   const [collapsed, setCollapsed] = useState(false);
   const recentLogs = (logs || []).slice(-7);
@@ -246,10 +328,9 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const [params] = useSearchParams();
   const initialQ = params.get('q') || 'Samsung OLED AI';
   const today = new Date();
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const query = manualScan?.query || initialQ;
-  const from = manualScan?.from || fmt(weekAgo);
+  const query = manualScan?.query ?? initialQ;
+  const from = manualScan?.from || fmt(today);
   const to = manualScan?.to || fmt(today);
   const pickedSites = manualScan?.pickedSites || [];
   const running = !!manualScan?.running;
@@ -272,11 +353,34 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const [draftExportOpen, setDraftExportOpen] = useState(false);
   const [hiddenCount, setHiddenCount] = useState(0);
   const [resultFilter, setResultFilter] = useState('All');
+  const [tourStep, setTourStep] = useState(null);
+  const queryRef = useRef(null);
+  const dateRangeRef = useRef(null);
+  const sourcesRef = useRef(null);
+  const searchRef = useRef(null);
 
   useEffect(() => {
     getSites().then((s) => setSites(Array.isArray(s) ? s : (s?.sites || []))).catch(() => {});
     getNotInterested().then((d) => setHiddenCount(Number(d?.count ?? d?.items?.length ?? 0))).catch(() => {});
+    if (window.localStorage.getItem(DEEP_SCAN_TOUR_KEY) !== 'true') {
+      setTourStep(0);
+    }
   }, []);
+
+  const dismissTour = () => {
+    window.localStorage.setItem(DEEP_SCAN_TOUR_KEY, 'true');
+    setTourStep(null);
+  };
+
+  const openTour = (step) => setTourStep(step);
+
+  const nextTourStep = () => {
+    if (tourStep >= DEEP_SCAN_TOUR_STEPS.length - 1) {
+      dismissTour();
+    } else {
+      setTourStep((current) => current + 1);
+    }
+  };
 
   const selectedBatch = useMemo(
     () => cards.filter((item) => checked[articleKey(item)]),
@@ -394,35 +498,70 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
           <div className="scan-query-label">
             <Icon name="search" size={15} />
             <span>Investigation query</span>
+            <button
+              className="scan-field-help"
+              title="Enter comma-separated keywords to search for more than one subject."
+              aria-label="Help: investigation keywords"
+              onClick={() => openTour(0)}
+              type="button"
+            >
+              ?
+            </button>
           </div>
           <div className="scan-query-primary">
-            <label className="scan-query-capsule">
+            <label className="scan-query-capsule" ref={queryRef}>
               <Icon name="search" size={20} />
               <input
                 className="scan-query-input"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') start(); }}
-                placeholder="Search a company, industry, technology, or event..."
+                placeholder="Keywords separated by commas, e.g. Samsung, OLED, Nvidia, robotics"
               />
             </label>
-            {running ? (
-              <button className="scan-run scan-run-primary stop" onClick={stop} type="button"><Icon name="stop" /> Stop Scan</button>
-            ) : (
-              <button className="scan-run scan-run-primary" onClick={start} type="button"><Icon name="search" /> Run Deep Search</button>
-            )}
+            <div className="scan-search-action" ref={searchRef}>
+              <button
+                className="scan-field-help scan-search-help"
+                title="Start a streamed manual search using this query, date range, and source scope."
+                aria-label="Help: run deep search"
+                onClick={() => openTour(3)}
+                type="button"
+              >
+                ?
+              </button>
+              {running ? (
+                <button className="scan-run scan-run-primary stop" onClick={stop} type="button"><Icon name="stop" /> Stop Scan</button>
+              ) : (
+                <button className="scan-run scan-run-primary" onClick={start} type="button"><Icon name="search" /> Run Deep Search</button>
+              )}
+            </div>
           </div>
           <div className="scan-command-controls">
-            <DateRangePicker
-              from={from}
-              to={to}
-              onChange={({ from: nextFrom, to: nextTo }) => {
-                setFrom(nextFrom);
-                setTo(nextTo);
-              }}
-            />
-            <div>
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sources</span>
+            <div ref={dateRangeRef}>
+              <DateRangePicker
+                from={from}
+                to={to}
+                helpText="Deep Search starts with today only. Choose a broader range when your investigation needs older signals."
+                onHelp={() => openTour(1)}
+                onChange={({ from: nextFrom, to: nextTo }) => {
+                  setFrom(nextFrom);
+                  setTo(nextTo);
+                }}
+              />
+            </div>
+            <div ref={sourcesRef}>
+              <div className="scan-field-label">
+                <span>Sources</span>
+                <button
+                  className="scan-field-help"
+                  title="Searches every active source unless you select specific publications here."
+                  aria-label="Help: source scope"
+                  onClick={() => openTour(2)}
+                  type="button"
+                >
+                  ?
+                </button>
+              </div>
               <SourcePicker sites={sites} selected={pickedSites} onApply={setPicked} />
             </div>
             <div className="scan-scope-note" aria-label="Manual search session behavior">
@@ -432,6 +571,15 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
           </div>
         </div>
       </section>
+
+      {tourStep !== null && (
+        <DeepScanTour
+          step={tourStep}
+          targetRef={[queryRef, dateRangeRef, sourcesRef, searchRef][tourStep]}
+          onNext={nextTourStep}
+          onDismiss={dismissTour}
+        />
+      )}
 
       {(started || cards.length > 0) && (
         <section className="scan-summary rounded-[22px] border border-white/10 bg-[#101827]/80 p-5">
