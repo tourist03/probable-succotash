@@ -420,7 +420,12 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
         setCards((c) => c.filter((x) => x.id !== item.id));
         setHiddenCount((n) => n + 1);
       } else if (v === 'up') {
-        await trainVote(query, item.summary || item.title, 'up', item.title);
+        await trainVote(
+          item.keywords_found || item.keywords || query,
+          item.master_summary || item.summary || item.title,
+          'interested',
+          item.title
+        );
       }
     } catch {}
   };

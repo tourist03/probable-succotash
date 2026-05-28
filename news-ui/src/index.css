@@ -4516,3 +4516,1304 @@ body.dossier-open .modal-overlay {
     height: 188px !important;
   }
 }
+
+.archive-search-page {
+  padding-bottom: 44px;
+}
+
+.archive-search-console {
+  overflow: hidden;
+  border: 1px solid rgba(192, 180, 255, 0.18);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(99, 102, 241, 0.16), transparent 34rem),
+    radial-gradient(circle at 86% 8%, rgba(20, 184, 166, 0.08), transparent 31rem),
+    linear-gradient(145deg, rgba(18, 13, 41, 0.88), rgba(8, 5, 23, 0.82));
+  box-shadow:
+    0 30px 90px rgba(2, 0, 14, 0.42),
+    inset 0 1px 1px rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(22px) saturate(1.08);
+}
+
+.archive-search-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 30px;
+  padding: 32px 34px 28px;
+}
+
+.archive-search-hero h1 {
+  margin-top: 12px;
+  max-width: 880px;
+  color: #f8fbff;
+  font-size: clamp(2.4rem, 4vw, 4.8rem);
+  line-height: .98;
+  font-weight: 640;
+  letter-spacing: 0;
+}
+
+.archive-search-hero p {
+  margin-top: 16px;
+  max-width: 770px;
+  color: #a7b7cf;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.archive-memory-meter {
+  align-self: stretch;
+  display: flex;
+  min-height: 158px;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid rgba(190, 179, 255, 0.18);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 22% 4%, rgba(99, 102, 241, 0.22), transparent 16rem),
+    rgba(8, 5, 22, 0.54);
+  padding: 22px;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+.archive-memory-meter span,
+.archive-keyword-ribbon > span,
+.archive-run-type {
+  color: #8b83b6;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.archive-memory-meter strong {
+  margin-top: 8px;
+  color: #ffffff;
+  font-size: 54px;
+  line-height: 1;
+  font-weight: 680;
+}
+
+.archive-memory-meter small {
+  margin-top: 10px;
+  color: #9aa7bc;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.archive-query-panel {
+  border-top: 1px solid rgba(192, 180, 255, 0.13);
+  background:
+    radial-gradient(ellipse at 18% 0%, rgba(99, 102, 241, 0.1), transparent 34rem),
+    rgba(7, 4, 20, 0.28);
+  padding: 24px 34px 30px;
+}
+
+.archive-range-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.6fr) auto 230px;
+  align-items: end;
+  gap: 14px;
+}
+
+.archive-preset-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 1px;
+}
+
+.archive-fetch-button {
+  height: 54px;
+  justify-content: center;
+}
+
+.archive-inline-search {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 18px;
+  min-height: 58px;
+  border: 1px solid rgba(204, 192, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0 20px;
+  color: #b9b1ff;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(99, 102, 241, 0.08);
+}
+
+.archive-inline-search:focus-within {
+  border-color: rgba(166, 148, 255, 0.48);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.12),
+    0 0 0 3px rgba(99, 102, 241, 0.11);
+}
+
+.archive-inline-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: #f3f2f0;
+  font-size: 18px;
+  outline: none;
+}
+
+.archive-inline-search input::placeholder {
+  color: rgba(205, 199, 230, 0.48);
+}
+
+.archive-clear-search {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(190, 179, 255, 0.14);
+  border-radius: 999px;
+  color: #a8a1d2;
+}
+
+.archive-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.archive-search-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.archive-keyword-ribbon,
+.archive-run-strip,
+.archive-results-panel {
+  border: 1px solid rgba(192, 180, 255, 0.17);
+  border-radius: 24px;
+  background:
+    linear-gradient(140deg, rgba(17, 12, 39, 0.7), rgba(8, 5, 22, 0.61));
+  box-shadow:
+    0 26px 82px rgba(2, 0, 14, 0.34),
+    inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+}
+
+.archive-keyword-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+}
+
+.archive-keyword-ribbon div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.archive-run-strip {
+  padding: 18px;
+}
+
+.archive-strip-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.archive-strip-head p {
+  margin-top: 5px;
+  color: #8998b0;
+  font-size: 13px;
+}
+
+.archive-strip-head > span {
+  color: #9eb8d9;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.archive-strip-scroll {
+  display: grid;
+  grid-auto-columns: minmax(128px, 1fr);
+  grid-auto-flow: column;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.archive-run-pill {
+  display: flex;
+  min-height: 76px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(192, 180, 255, 0.14);
+  border-radius: 17px;
+  background: rgba(12, 7, 30, 0.58);
+  padding: 12px 14px;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.archive-run-pill:hover,
+.archive-run-pill.active {
+  border-color: rgba(213, 172, 93, 0.38);
+  background: rgba(55, 39, 16, 0.28);
+  transform: translateY(-1px);
+}
+
+.archive-run-time {
+  color: #f5f0dc;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.archive-results-panel {
+  padding: 22px;
+}
+
+.archive-results-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.archive-results-head h2 {
+  margin-top: 6px;
+  color: #f4f8ff;
+  font-size: 24px;
+  font-weight: 650;
+}
+
+.archive-results-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.archive-results-actions > span {
+  color: #8796ad;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+@media (max-width: 1180px) {
+  .archive-search-hero,
+  .archive-range-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .archive-filter-grid,
+  .archive-search-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media not all {
+/* ============================================================
+   Light appearance mode: scoped opt-in layer, dark remains default
+   ============================================================ */
+html[data-theme="light"] {
+  color-scheme: light;
+  --theme-page: #edf3fb;
+  --theme-page-soft: #f6f9fd;
+  --theme-panel: rgba(255, 255, 255, 0.82);
+  --theme-panel-solid: #ffffff;
+  --theme-elevated: rgba(255, 255, 255, 0.94);
+  --theme-border: rgba(72, 92, 128, 0.16);
+  --theme-border-strong: rgba(45, 78, 128, 0.24);
+  --theme-text: #101827;
+  --theme-text-soft: #263448;
+  --theme-muted: #617089;
+  --theme-faint: #8491a5;
+  --theme-input: rgba(255, 255, 255, 0.86);
+  --theme-chip: rgba(35, 102, 196, 0.08);
+  --theme-chip-border: rgba(35, 102, 196, 0.18);
+  --theme-modal: rgba(255, 255, 255, 0.97);
+  --theme-shadow: 0 18px 58px rgba(31, 49, 81, 0.14);
+  --theme-accent: #2563eb;
+  --theme-accent-soft: rgba(37, 99, 235, 0.12);
+}
+
+html[data-theme="light"] body,
+html[data-theme="light"] .resolution-root,
+html[data-theme="light"] .resolution-canvas {
+  background:
+    radial-gradient(circle at 11% 4%, rgba(74, 144, 226, 0.14), transparent 24rem),
+    radial-gradient(circle at 91% 14%, rgba(14, 165, 233, 0.1), transparent 24rem),
+    linear-gradient(180deg, #f7fbff 0%, #e8f0fa 54%, #edf3fb 100%) !important;
+}
+
+html[data-theme="light"] .design-main {
+  color: var(--theme-text);
+}
+
+.app-shell[data-theme="light"] {
+  color: var(--theme-text);
+}
+
+.app-shell[data-theme="light"]::before {
+  opacity: 0.08;
+  filter: saturate(0.6) brightness(1.1);
+}
+
+.app-shell[data-theme="light"] .design-header {
+  border-bottom-color: rgba(48, 73, 112, 0.14) !important;
+  background: rgba(249, 252, 255, 0.96) !important;
+  box-shadow: 0 8px 28px rgba(31, 49, 81, 0.12);
+}
+
+.app-shell[data-theme="light"] .news-word {
+  color: #101827;
+}
+
+.app-shell[data-theme="light"] .scrapper-word {
+  color: #2563eb;
+}
+
+.app-shell[data-theme="light"] .design-header.is-broadcast .scrapper-word {
+  color: #d97706;
+}
+
+.app-shell[data-theme="light"] .profile-badge {
+  border-color: rgba(37, 99, 235, 0.2);
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d5bbf;
+}
+
+.app-shell[data-theme="light"] .design-header.is-broadcast .profile-badge {
+  border-color: rgba(217, 119, 6, 0.22);
+  background: rgba(217, 119, 6, 0.09);
+  color: #b45309;
+}
+
+.app-shell[data-theme="light"] .command-nav-link,
+.app-shell[data-theme="light"] .command-settings-trigger {
+  border-color: rgba(48, 73, 112, 0.13) !important;
+  background: rgba(255, 255, 255, 0.66) !important;
+  color: #4b5b73 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.app-shell[data-theme="light"] .command-nav-link:hover,
+.app-shell[data-theme="light"] .command-settings-trigger:hover {
+  border-color: rgba(37, 99, 235, 0.24) !important;
+  background: rgba(37, 99, 235, 0.08) !important;
+  color: #17376d !important;
+}
+
+.app-shell[data-theme="light"] .command-nav-link.active {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d5bbf;
+}
+
+.app-shell[data-theme="light"] .design-header.is-broadcast .command-nav-link.active {
+  border-color: rgba(217, 119, 6, 0.3);
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.app-shell[data-theme="light"] .command-settings-menu {
+  border-color: rgba(48, 73, 112, 0.15) !important;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(37, 99, 235, 0.1), transparent 18rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(241, 246, 253, 0.98)) !important;
+  box-shadow: 0 30px 90px rgba(31, 49, 81, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+}
+
+.app-shell[data-theme="light"] .command-settings-item {
+  color: #4f5f76 !important;
+}
+
+.app-shell[data-theme="light"] .command-settings-item:hover {
+  background: rgba(37, 99, 235, 0.08) !important;
+  color: #132640 !important;
+}
+
+.settings-appearance {
+  border: 1px solid rgba(197, 185, 255, 0.13);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 10px;
+}
+
+.settings-appearance-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #e9e6ff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.settings-appearance-label small {
+  color: #7f86a0;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.settings-theme-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.settings-theme-option {
+  height: 32px;
+  border: 1px solid rgba(197, 185, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #aeb4cc;
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.settings-theme-option:hover {
+  border-color: rgba(108, 176, 255, 0.26);
+  color: #f5f8ff;
+}
+
+.settings-theme-option.active {
+  border-color: rgba(84, 167, 255, 0.36);
+  background: rgba(37, 99, 235, 0.2);
+  color: #e8f4ff;
+  box-shadow: 0 0 18px rgba(37, 99, 235, 0.16);
+}
+
+.design-header.is-broadcast .settings-theme-option.active {
+  border-color: rgba(240, 179, 78, 0.36);
+  background: rgba(217, 119, 6, 0.18);
+  color: #ffe3af;
+  box-shadow: 0 0 18px rgba(217, 119, 6, 0.14);
+}
+
+.app-shell[data-theme="light"] .settings-appearance {
+  border-color: rgba(48, 73, 112, 0.14);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.app-shell[data-theme="light"] .settings-appearance-label {
+  color: #17233a;
+}
+
+.app-shell[data-theme="light"] .settings-appearance-label small {
+  color: #758198;
+}
+
+.app-shell[data-theme="light"] .settings-theme-option {
+  border-color: rgba(48, 73, 112, 0.12);
+  background: rgba(231, 238, 249, 0.7);
+  color: #5b6780;
+}
+
+.app-shell[data-theme="light"] .settings-theme-option.active {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(37, 99, 235, 0.11);
+  color: #1d5bbf;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 0 18px rgba(37, 99, 235, 0.08);
+}
+
+.app-shell[data-theme="light"] .design-header.is-broadcast .settings-theme-option.active {
+  border-color: rgba(217, 119, 6, 0.3);
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.app-shell[data-theme="light"] .settings-language-preview {
+  border-color: rgba(37, 99, 235, 0.18);
+  background:
+    radial-gradient(circle at 19% 30%, rgba(37, 99, 235, 0.1), transparent 38%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.88), rgba(236, 242, 251, 0.8));
+  color: #17233a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 0 25px rgba(37, 99, 235, 0.06);
+}
+
+.app-shell[data-theme="light"] .settings-language-title {
+  color: #17233a;
+}
+
+.app-shell[data-theme="light"] .settings-language-note {
+  color: #6c7890;
+}
+
+.app-shell[data-theme="light"] .settings-language-orbit {
+  border-color: rgba(37, 99, 235, 0.2);
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+}
+
+.app-shell[data-theme="light"] .settings-language-beta {
+  border-color: rgba(217, 119, 6, 0.24);
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.app-shell[data-theme="light"] .cockpit-top-card,
+.app-shell[data-theme="light"] .latest-day-stage,
+.app-shell[data-theme="light"] .loaded-briefing-panel,
+.app-shell[data-theme="light"] .scan-summary,
+.app-shell[data-theme="light"] .scan-console,
+.app-shell[data-theme="light"] .scan-query-console,
+.app-shell[data-theme="light"] .source-category-card,
+.app-shell[data-theme="light"] .source-picker-dialog,
+.app-shell[data-theme="light"] .source-picker-head,
+.app-shell[data-theme="light"] .source-picker-tools,
+.app-shell[data-theme="light"] .source-picker-foot,
+.app-shell[data-theme="light"] .scan-activity-panel,
+.app-shell[data-theme="light"] .batch-action-bar,
+.app-shell[data-theme="light"] .modal,
+.app-shell[data-theme="light"] .compact-dialog,
+.app-shell[data-theme="light"] .voc-modal,
+.app-shell[data-theme="light"] .glass-panel,
+.app-shell[data-theme="light"] .archive-run-card,
+.app-shell[data-theme="light"] [class*="bg-[#101827]"],
+.app-shell[data-theme="light"] [class*="bg-[#0b1220]"] {
+  border-color: var(--theme-border) !important;
+  background: var(--theme-panel) !important;
+  color: var(--theme-text) !important;
+  box-shadow: var(--theme-shadow) !important;
+}
+
+.app-shell[data-theme="light"] .modal,
+.app-shell[data-theme="light"] .compact-dialog,
+.app-shell[data-theme="light"] .voc-modal,
+.app-shell[data-theme="light"] .source-picker-dialog {
+  background: var(--theme-modal) !important;
+}
+
+.app-shell[data-theme="light"] .modal-overlay,
+.app-shell[data-theme="light"] .source-picker-scrim,
+.app-shell[data-theme="light"] .calendar-popover-scrim,
+.app-shell[data-theme="light"] .scan-tour-scrim {
+  background: rgba(236, 242, 251, 0.68) !important;
+  backdrop-filter: blur(16px) saturate(1.05);
+}
+
+.app-shell[data-theme="light"] .dark-input,
+.app-shell[data-theme="light"] .dark-textarea,
+.app-shell[data-theme="light"] input,
+.app-shell[data-theme="light"] select,
+.app-shell[data-theme="light"] textarea {
+  border-color: var(--theme-border) !important;
+  background: var(--theme-input) !important;
+  color: var(--theme-text) !important;
+  color-scheme: light !important;
+}
+
+.app-shell[data-theme="light"] .dark-input::placeholder,
+.app-shell[data-theme="light"] .dark-textarea::placeholder,
+.app-shell[data-theme="light"] input::placeholder,
+.app-shell[data-theme="light"] textarea::placeholder {
+  color: #8793a7 !important;
+}
+
+.app-shell[data-theme="light"] .dark-input:focus,
+.app-shell[data-theme="light"] .dark-textarea:focus,
+.app-shell[data-theme="light"] input:focus,
+.app-shell[data-theme="light"] select:focus,
+.app-shell[data-theme="light"] textarea:focus {
+  border-color: rgba(37, 99, 235, 0.34) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+}
+
+.app-shell[data-theme="light"] .btn-dark-primary {
+  border-color: rgba(37, 99, 235, 0.22) !important;
+  background: linear-gradient(180deg, #4f9cff, #2563eb) !important;
+  color: #fff !important;
+}
+
+.app-shell[data-theme="light"] .btn-dark-secondary,
+.app-shell[data-theme="light"] .carousel-control,
+.app-shell[data-theme="light"] .source-chip,
+.app-shell[data-theme="light"] .signal-chip,
+.app-shell[data-theme="light"] .rating-button {
+  border-color: var(--theme-chip-border) !important;
+  background: var(--theme-chip) !important;
+  color: #2d4a73 !important;
+}
+
+.app-shell[data-theme="light"] .signal-chip.selected,
+.app-shell[data-theme="light"] .rating-button.active,
+.app-shell[data-theme="light"] .scan-filter-chip.active {
+  border-color: rgba(37, 99, 235, 0.3) !important;
+  background: rgba(37, 99, 235, 0.12) !important;
+  color: #1d5bbf !important;
+}
+
+.app-shell[data-theme="light"] .scan-filter-chip,
+.app-shell[data-theme="light"] .hidden-review-link,
+.app-shell[data-theme="light"] .source-option,
+.app-shell[data-theme="light"] .source-coverage-card,
+.app-shell[data-theme="light"] .dossier-tile,
+.app-shell[data-theme="light"] .signal-stat,
+.app-shell[data-theme="light"] .market-row,
+.app-shell[data-theme="light"] .market-note,
+.app-shell[data-theme="light"] .rounded-2xl,
+.app-shell[data-theme="light"] .rounded-\[22px\],
+.app-shell[data-theme="light"] .rounded-\[24px\],
+.app-shell[data-theme="light"] .rounded-\[28px\] {
+  border-color: var(--theme-border) !important;
+}
+
+.app-shell[data-theme="light"] .text-white,
+.app-shell[data-theme="light"] .text-slate-100,
+.app-shell[data-theme="light"] .text-slate-200,
+.app-shell[data-theme="light"] .text-slate-300 {
+  color: var(--theme-text) !important;
+}
+
+.app-shell[data-theme="light"] .text-slate-400,
+.app-shell[data-theme="light"] .text-slate-500,
+.app-shell[data-theme="light"] .text-slate-600 {
+  color: var(--theme-muted) !important;
+}
+
+.app-shell[data-theme="light"] .text-sky-200,
+.app-shell[data-theme="light"] .text-sky-100 {
+  color: #1d5bbf !important;
+}
+
+.app-shell[data-theme="light"] .eyebrow,
+.app-shell[data-theme="light"] .scan-filter-label,
+.app-shell[data-theme="light"] .scan-query-label,
+.app-shell[data-theme="light"] .scan-field-label > span:first-child {
+  color: #34608f !important;
+}
+
+.app-shell[data-theme="light"] .hero-cluster-panel,
+.app-shell[data-theme="light"] .image-feed-card,
+.app-shell[data-theme="light"] .latest-signal-card,
+.app-shell[data-theme="light"] .archive-run-card.group,
+.app-shell[data-theme="light"] .history-hero-card {
+  border-color: rgba(48, 73, 112, 0.2) !important;
+  background: #101827 !important;
+  color: #fff !important;
+  box-shadow: 0 20px 54px rgba(31, 49, 81, 0.18) !important;
+}
+
+.app-shell[data-theme="light"] .hero-cluster-panel .text-white,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-100,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-200,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-300,
+.app-shell[data-theme="light"] .image-feed-card .text-white,
+.app-shell[data-theme="light"] .image-feed-card .text-slate-100,
+.app-shell[data-theme="light"] .image-feed-card .text-slate-200,
+.app-shell[data-theme="light"] .image-feed-card .text-slate-300,
+.app-shell[data-theme="light"] .latest-signal-card .text-white,
+.app-shell[data-theme="light"] .latest-signal-card .text-slate-100,
+.app-shell[data-theme="light"] .latest-signal-card .text-slate-200,
+.app-shell[data-theme="light"] .latest-signal-card .text-slate-300,
+.app-shell[data-theme="light"] .archive-run-card.group .text-white,
+.app-shell[data-theme="light"] .archive-run-card.group .text-slate-100,
+.app-shell[data-theme="light"] .archive-run-card.group .text-slate-200,
+.app-shell[data-theme="light"] .archive-run-card.group .text-slate-300 {
+  color: #fff !important;
+}
+
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-400,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-500,
+.app-shell[data-theme="light"] .image-feed-card .text-slate-400,
+.app-shell[data-theme="light"] .image-feed-card .text-slate-500,
+.app-shell[data-theme="light"] .latest-signal-card .text-slate-400,
+.app-shell[data-theme="light"] .latest-signal-card .text-slate-500 {
+  color: rgba(226, 232, 240, 0.88) !important;
+}
+
+.app-shell[data-theme="light"] .hero-cluster-panel .source-chip,
+.app-shell[data-theme="light"] .image-feed-card .source-chip,
+.app-shell[data-theme="light"] .latest-signal-card .signal-chip,
+.app-shell[data-theme="light"] .archive-run-card.group .source-chip {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(15, 23, 42, 0.48) !important;
+  color: #fff !important;
+}
+
+.app-shell[data-theme="light"] .feed-card-copy {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(5, 9, 20, 0.62) !important;
+}
+
+.app-shell[data-theme="light"] .modal.dossier .dossier-main,
+.app-shell[data-theme="light"] .modal.dossier .dossier-rail {
+  border-color: var(--theme-border) !important;
+  background: rgba(255, 255, 255, 0.58) !important;
+}
+
+.app-shell[data-theme="light"] .dossier-image-wrap,
+.app-shell[data-theme="light"] .dossier-hero-image {
+  background: #0f172a !important;
+}
+
+.app-shell[data-theme="light"] .scan-tour-card {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: var(--theme-elevated);
+  color: var(--theme-text);
+  box-shadow: var(--theme-shadow);
+}
+
+.app-shell[data-theme="light"] .scan-tour-card h3,
+.app-shell[data-theme="light"] .scan-tour-card p {
+  color: var(--theme-text);
+}
+
+.app-shell[data-theme="light"] .scan-tour-card p {
+  color: var(--theme-muted);
+}
+
+.app-shell[data-theme="light"] .scan-tour-next {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: linear-gradient(118deg, #4f9cff, #2563eb);
+}
+
+.app-shell[data-theme="light"] .voc-required {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d5bbf;
+}
+
+.app-shell[data-theme="light"] table,
+.app-shell[data-theme="light"] th,
+.app-shell[data-theme="light"] td {
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+/* Light mode needs its own Sense desk atmosphere, not the dark Sense video underneath. */
+html[data-theme="light"] body,
+html[data-theme="light"] .resolution-root {
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(87, 154, 238, 0.22), transparent 38rem),
+    radial-gradient(ellipse at 84% 4%, rgba(22, 163, 184, 0.12), transparent 42rem),
+    linear-gradient(180deg, #f8fbff 0%, #edf4fc 45%, #e6eef8 100%) !important;
+}
+
+.app-shell[data-theme="light"] .product-atmosphere {
+  background:
+    linear-gradient(rgba(54, 92, 145, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(54, 92, 145, 0.045) 1px, transparent 1px),
+    radial-gradient(circle at 12% 6%, rgba(37, 99, 235, 0.18), transparent 24rem),
+    radial-gradient(circle at 88% 9%, rgba(14, 165, 233, 0.12), transparent 28rem),
+    radial-gradient(circle at 50% 68%, rgba(148, 163, 184, 0.16), transparent 38rem),
+    linear-gradient(140deg, #f9fcff 0%, #eef5fd 48%, #e6eef8 100%) !important;
+  background-size: 42px 42px, 42px 42px, auto, auto, auto, auto;
+}
+
+.app-shell[data-theme="light"] .product-atmosphere-video {
+  opacity: 0 !important;
+}
+
+.app-shell[data-theme="light"] .product-atmosphere-material,
+.app-shell[data-theme="light"] .product-atmosphere:not(.is-live) .product-atmosphere-material {
+  background:
+    linear-gradient(118deg, transparent 0 42%, rgba(37, 99, 235, 0.055) 42% 43%, transparent 43% 100%),
+    radial-gradient(ellipse at 28% 18%, rgba(255, 255, 255, 0.7), transparent 31rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(233, 241, 250, 0.74) 1200px) !important;
+}
+
+.app-shell[data-theme="light"] .design-main {
+  text-shadow: none;
+}
+
+.app-shell[data-theme="light"] .cockpit-top-card,
+.app-shell[data-theme="light"] .latest-day-stage,
+.app-shell[data-theme="light"] .loaded-briefing-panel,
+.app-shell[data-theme="light"] .scan-console,
+.app-shell[data-theme="light"] .scan-filter-rail,
+.app-shell[data-theme="light"] .scan-summary,
+.app-shell[data-theme="light"] .source-picker-dialog,
+.app-shell[data-theme="light"] .glass-panel,
+.app-shell[data-theme="light"] .archive-run-card:not(.group) {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(239, 246, 255, 0.82)) !important;
+}
+
+.app-shell[data-theme="light"] .market-panel,
+.app-shell[data-theme="light"] .briefing-stream-panel {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(237, 244, 253, 0.82)) !important;
+}
+
+.app-shell[data-theme="light"] .scan-console-header {
+  background:
+    radial-gradient(circle at 22% 10%, rgba(37, 99, 235, 0.08), transparent 28rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(236, 243, 252, 0.28));
+}
+
+.app-shell[data-theme="light"] .scan-title h1 {
+  color: #132033 !important;
+}
+
+.app-shell[data-theme="light"] .scan-title p {
+  color: #4f617a !important;
+}
+
+.app-shell[data-theme="light"] .scan-telemetry {
+  border-color: rgba(37, 99, 235, 0.16);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(37, 99, 235, 0.08), transparent 18rem),
+    rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.app-shell[data-theme="light"] .scan-telemetry-head,
+.app-shell[data-theme="light"] .scan-telemetry-grid strong {
+  color: #16243a;
+}
+
+.app-shell[data-theme="light"] .scan-telemetry-grid div {
+  border-color: rgba(37, 99, 235, 0.13);
+  background: rgba(236, 243, 252, 0.88);
+}
+
+.app-shell[data-theme="light"] .scan-telemetry-grid span,
+.app-shell[data-theme="light"] .scan-telemetry > p {
+  color: #6a7890;
+}
+
+.app-shell[data-theme="light"] .scan-query-console {
+  background:
+    radial-gradient(ellipse at 19% 0%, rgba(37, 99, 235, 0.08), transparent 32rem),
+    rgba(255, 255, 255, 0.44) !important;
+}
+
+.app-shell[data-theme="light"] .scan-query-capsule {
+  border-color: rgba(37, 99, 235, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 12px 34px rgba(31, 49, 81, 0.08);
+}
+
+.app-shell[data-theme="light"] .scan-query-capsule .scan-query-input {
+  background: transparent !important;
+  color: #121c2e !important;
+}
+
+.app-shell[data-theme="light"] .scan-query-capsule .scan-query-input::placeholder {
+  color: #7d8aa0 !important;
+}
+
+.app-shell[data-theme="light"] .scan-scope-note {
+  border-color: rgba(37, 99, 235, 0.12);
+  background: rgba(255, 255, 255, 0.66);
+}
+
+/* ============================================================
+   Light mode v2: coherent daylight intelligence desk
+   ============================================================ */
+html[data-theme="light"] {
+  --day-bg-0: #dde8f4;
+  --day-bg-1: #e8f0f8;
+  --day-bg-2: #f2f6fb;
+  --day-panel: rgba(235, 242, 249, 0.88);
+  --day-panel-strong: rgba(244, 248, 252, 0.94);
+  --day-panel-muted: rgba(221, 232, 243, 0.86);
+  --day-border: rgba(91, 113, 145, 0.2);
+  --day-border-strong: rgba(70, 101, 146, 0.28);
+  --day-text: #111c2f;
+  --day-text-2: #27364c;
+  --day-muted: #617187;
+  --day-faint: #8492a6;
+  --day-blue: #2563eb;
+  --day-blue-soft: rgba(37, 99, 235, 0.11);
+  --day-amber: #b86b05;
+  --day-shadow: 0 22px 58px rgba(36, 52, 78, 0.16);
+  --day-inner: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+html[data-theme="light"] body,
+html[data-theme="light"] .resolution-root,
+html[data-theme="light"] .resolution-canvas {
+  background:
+    linear-gradient(115deg, rgba(31, 76, 130, 0.09) 0 22%, transparent 22% 100%),
+    linear-gradient(64deg, transparent 0 70%, rgba(53, 119, 184, 0.075) 70% 100%),
+    radial-gradient(ellipse at 13% 0%, rgba(68, 128, 203, 0.22), transparent 42rem),
+    radial-gradient(ellipse at 88% 7%, rgba(14, 165, 233, 0.12), transparent 40rem),
+    linear-gradient(180deg, var(--day-bg-2) 0%, var(--day-bg-1) 46%, var(--day-bg-0) 100%) !important;
+  color: var(--day-text);
+}
+
+.app-shell[data-theme="light"] .product-atmosphere {
+  background:
+    linear-gradient(rgba(66, 91, 124, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(66, 91, 124, 0.04) 1px, transparent 1px),
+    radial-gradient(circle at 18% 10%, rgba(37, 99, 235, 0.12), transparent 25rem),
+    radial-gradient(circle at 86% 14%, rgba(20, 184, 166, 0.08), transparent 29rem),
+    linear-gradient(140deg, rgba(248, 251, 255, 0.95), rgba(226, 237, 248, 0.92)) !important;
+  background-size: 44px 44px, 44px 44px, auto, auto, auto;
+}
+
+.app-shell[data-theme="light"] .product-atmosphere-video {
+  opacity: 0 !important;
+}
+
+.app-shell[data-theme="light"] .product-atmosphere-material,
+.app-shell[data-theme="light"] .product-atmosphere:not(.is-live) .product-atmosphere-material {
+  background:
+    linear-gradient(118deg, transparent 0 41%, rgba(31, 76, 130, 0.065) 41% 42%, transparent 42% 100%),
+    radial-gradient(ellipse at 38% 22%, rgba(255, 255, 255, 0.62), transparent 34rem),
+    linear-gradient(180deg, rgba(246, 250, 254, 0.16), rgba(213, 226, 240, 0.68) 1180px) !important;
+}
+
+.app-shell[data-theme="light"] .design-header {
+  background: rgba(235, 242, 249, 0.92) !important;
+  border-bottom: 1px solid rgba(91, 113, 145, 0.16) !important;
+  box-shadow: 0 10px 30px rgba(37, 52, 78, 0.12);
+  backdrop-filter: blur(18px) saturate(1.05);
+}
+
+.app-shell[data-theme="light"] .command-header-inner {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.app-shell[data-theme="light"] .command-nav {
+  border-color: var(--day-border);
+  background: rgba(226, 236, 247, 0.72);
+  box-shadow: var(--day-inner);
+}
+
+.app-shell[data-theme="light"] .command-nav-link,
+.app-shell[data-theme="light"] .command-settings-trigger {
+  border-color: rgba(90, 115, 148, 0.16) !important;
+  background: rgba(246, 250, 254, 0.66) !important;
+  color: #526176 !important;
+}
+
+.app-shell[data-theme="light"] .command-nav-link.active,
+.app-shell[data-theme="light"] .command-nav-link:hover,
+.app-shell[data-theme="light"] .command-settings-trigger:hover {
+  border-color: rgba(37, 99, 235, 0.25) !important;
+  background: rgba(37, 99, 235, 0.1) !important;
+  color: #1d4fbe !important;
+}
+
+.app-shell[data-theme="light"] .design-header.is-broadcast .command-nav-link.active {
+  border-color: rgba(184, 107, 5, 0.3) !important;
+  background: rgba(184, 107, 5, 0.1) !important;
+  color: var(--day-amber) !important;
+}
+
+.app-shell[data-theme="light"] .cockpit-top-card,
+.app-shell[data-theme="light"] .market-panel,
+.app-shell[data-theme="light"] .briefing-stream-panel,
+.app-shell[data-theme="light"] .latest-day-stage,
+.app-shell[data-theme="light"] .loaded-briefing-panel,
+.app-shell[data-theme="light"] .scan-console,
+.app-shell[data-theme="light"] .scan-summary,
+.app-shell[data-theme="light"] .scan-filter-rail,
+.app-shell[data-theme="light"] .workflow-console,
+.app-shell[data-theme="light"] .workflow-metric,
+.app-shell[data-theme="light"] .workflow-filter-rail,
+.app-shell[data-theme="light"] .workflow-empty,
+.app-shell[data-theme="light"] .archive-run-card:not(.group),
+.app-shell[data-theme="light"] .source-category-card,
+.app-shell[data-theme="light"] .glass-panel,
+.app-shell[data-theme="light"] [class*="bg-[#101827]"]:not(.hero-cluster-panel):not(.latest-signal-card):not(.image-feed-card),
+.app-shell[data-theme="light"] [class*="bg-[#0b1220]"]:not(.dossier-rail) {
+  border-color: var(--day-border) !important;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(37, 99, 235, 0.055), transparent 20rem),
+    linear-gradient(145deg, var(--day-panel-strong), var(--day-panel)) !important;
+  color: var(--day-text) !important;
+  box-shadow: var(--day-shadow), var(--day-inner) !important;
+}
+
+.app-shell[data-theme="light"] .market-panel,
+.app-shell[data-theme="light"] .briefing-stream-panel,
+.app-shell[data-theme="light"] .scan-console {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(37, 99, 235, 0.08), transparent 24rem),
+    linear-gradient(145deg, rgba(241, 247, 252, 0.94), rgba(224, 235, 247, 0.9)) !important;
+}
+
+.app-shell[data-theme="light"] .latest-day-stage,
+.app-shell[data-theme="light"] .loaded-briefing-panel {
+  background:
+    linear-gradient(145deg, rgba(238, 245, 252, 0.94), rgba(219, 231, 244, 0.9)) !important;
+}
+
+.app-shell[data-theme="light"] .hero-cluster-panel,
+.app-shell[data-theme="light"] .latest-signal-card,
+.app-shell[data-theme="light"] .image-feed-card,
+.app-shell[data-theme="light"] .archive-run-card.group,
+.app-shell[data-theme="light"] article.group[class*="bg-[#101827]"] {
+  border-color: rgba(42, 63, 92, 0.26) !important;
+  background: #101827 !important;
+  color: #ffffff !important;
+  box-shadow: 0 26px 72px rgba(31, 49, 81, 0.26) !important;
+}
+
+.app-shell[data-theme="light"] .hero-cluster-panel .text-white,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-100,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-200,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-300,
+.app-shell[data-theme="light"] .latest-signal-card .text-white,
+.app-shell[data-theme="light"] .latest-signal-card .text-slate-100,
+.app-shell[data-theme="light"] .latest-signal-card .text-slate-200,
+.app-shell[data-theme="light"] .latest-signal-card .text-slate-300,
+.app-shell[data-theme="light"] .image-feed-card .text-white,
+.app-shell[data-theme="light"] .image-feed-card .text-slate-100,
+.app-shell[data-theme="light"] .image-feed-card .text-slate-200,
+.app-shell[data-theme="light"] .image-feed-card .text-slate-300,
+.app-shell[data-theme="light"] article.group[class*="bg-[#101827]"] .text-white,
+.app-shell[data-theme="light"] article.group[class*="bg-[#101827]"] .text-slate-100,
+.app-shell[data-theme="light"] article.group[class*="bg-[#101827]"] .text-slate-200,
+.app-shell[data-theme="light"] article.group[class*="bg-[#101827]"] .text-slate-300 {
+  color: #ffffff !important;
+}
+
+.app-shell[data-theme="light"] .feed-card-copy,
+.app-shell[data-theme="light"] article.group[class*="bg-[#101827]"] .bg-\[\#07111f\]\/58 {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(6, 14, 28, 0.72) !important;
+  color: #ffffff !important;
+}
+
+.app-shell[data-theme="light"] .text-white,
+.app-shell[data-theme="light"] .text-slate-100,
+.app-shell[data-theme="light"] .text-slate-200,
+.app-shell[data-theme="light"] .text-slate-300,
+html[data-theme="light"] .modal .text-white,
+html[data-theme="light"] .modal .text-slate-100,
+html[data-theme="light"] .modal .text-slate-200,
+html[data-theme="light"] .modal .text-slate-300 {
+  color: var(--day-text) !important;
+}
+
+.app-shell[data-theme="light"] .text-slate-400,
+.app-shell[data-theme="light"] .text-slate-500,
+.app-shell[data-theme="light"] .text-slate-600,
+html[data-theme="light"] .modal .text-slate-400,
+html[data-theme="light"] .modal .text-slate-500,
+html[data-theme="light"] .modal .text-slate-600 {
+  color: var(--day-muted) !important;
+}
+
+.app-shell[data-theme="light"] .text-sky-100,
+.app-shell[data-theme="light"] .text-sky-200,
+html[data-theme="light"] .modal .text-sky-100,
+html[data-theme="light"] .modal .text-sky-200 {
+  color: #1d5bbf !important;
+}
+
+.app-shell[data-theme="light"] .eyebrow,
+.app-shell[data-theme="light"] .scan-query-label,
+.app-shell[data-theme="light"] .scan-field-label > span:first-child,
+.app-shell[data-theme="light"] .scan-filter-label,
+.app-shell[data-theme="light"] .workflow-filter-label {
+  color: #335d8d !important;
+}
+
+.app-shell[data-theme="light"] .scan-console-header {
+  background:
+    radial-gradient(circle at 17% 0%, rgba(37, 99, 235, 0.08), transparent 28rem),
+    linear-gradient(180deg, rgba(240, 247, 253, 0.62), rgba(224, 235, 247, 0.34)) !important;
+}
+
+.app-shell[data-theme="light"] .scan-title h1 {
+  color: var(--day-text) !important;
+}
+
+.app-shell[data-theme="light"] .scan-title p,
+.app-shell[data-theme="light"] .scan-scope-note p {
+  color: #53657c !important;
+}
+
+.app-shell[data-theme="light"] .scan-telemetry,
+.app-shell[data-theme="light"] .workflow-status,
+.app-shell[data-theme="light"] .scan-scope-note,
+.app-shell[data-theme="light"] .market-row,
+.app-shell[data-theme="light"] .market-note,
+.app-shell[data-theme="light"] .signal-stat,
+.app-shell[data-theme="light"] .source-option,
+.app-shell[data-theme="light"] .source-coverage-card,
+.app-shell[data-theme="light"] .dossier-tile {
+  border-color: var(--day-border) !important;
+  background: var(--day-panel-muted) !important;
+  color: var(--day-text) !important;
+}
+
+.app-shell[data-theme="light"] .scan-telemetry-grid div,
+.app-shell[data-theme="light"] .workflow-status-grid div {
+  border-color: rgba(70, 101, 146, 0.16);
+  background: rgba(242, 247, 252, 0.78);
+}
+
+.app-shell[data-theme="light"] .scan-query-console {
+  border-top-color: rgba(91, 113, 145, 0.16);
+  background:
+    radial-gradient(ellipse at 16% 0%, rgba(37, 99, 235, 0.06), transparent 34rem),
+    rgba(232, 240, 249, 0.48) !important;
+}
+
+.app-shell[data-theme="light"] .scan-query-capsule,
+.app-shell[data-theme="light"] .dark-input,
+.app-shell[data-theme="light"] .dark-textarea,
+.app-shell[data-theme="light"] input,
+.app-shell[data-theme="light"] select,
+.app-shell[data-theme="light"] textarea,
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] textarea {
+  border-color: rgba(91, 113, 145, 0.2) !important;
+  background: rgba(247, 250, 253, 0.86) !important;
+  color: var(--day-text) !important;
+  box-shadow: var(--day-inner) !important;
+  color-scheme: light !important;
+}
+
+.app-shell[data-theme="light"] .scan-query-capsule .scan-query-input {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.app-shell[data-theme="light"] .scan-query-capsule:focus-within,
+.app-shell[data-theme="light"] .dark-input:focus,
+.app-shell[data-theme="light"] .dark-textarea:focus,
+.app-shell[data-theme="light"] input:focus,
+.app-shell[data-theme="light"] select:focus,
+.app-shell[data-theme="light"] textarea:focus {
+  border-color: rgba(37, 99, 235, 0.35) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1), var(--day-inner) !important;
+}
+
+.app-shell[data-theme="light"] .source-chip,
+.app-shell[data-theme="light"] .signal-chip,
+.app-shell[data-theme="light"] .scan-filter-chip,
+.app-shell[data-theme="light"] .workflow-filter-chip,
+.app-shell[data-theme="light"] .carousel-control,
+.app-shell[data-theme="light"] .btn-dark-secondary,
+html[data-theme="light"] .source-chip,
+html[data-theme="light"] .signal-chip,
+html[data-theme="light"] .btn-dark-secondary {
+  border-color: rgba(70, 101, 146, 0.2) !important;
+  background: rgba(229, 238, 248, 0.72) !important;
+  color: #33465e !important;
+}
+
+.app-shell[data-theme="light"] .signal-chip.selected,
+.app-shell[data-theme="light"] .scan-filter-chip.active,
+.app-shell[data-theme="light"] .workflow-filter-chip.active,
+html[data-theme="light"] .signal-chip.selected {
+  border-color: rgba(37, 99, 235, 0.3) !important;
+  background: rgba(37, 99, 235, 0.12) !important;
+  color: #1d4fbe !important;
+}
+
+.app-shell[data-theme="light"] .hero-cluster-panel .source-chip,
+.app-shell[data-theme="light"] .latest-signal-card .signal-chip,
+.app-shell[data-theme="light"] .image-feed-card .source-chip,
+.app-shell[data-theme="light"] article.group[class*="bg-[#101827]"] .source-chip,
+.app-shell[data-theme="light"] article.group[class*="bg-[#101827]"] .signal-chip {
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  background: rgba(15, 23, 42, 0.5) !important;
+  color: #ffffff !important;
+}
+
+.app-shell[data-theme="light"] .btn-dark-primary,
+html[data-theme="light"] .btn-dark-primary,
+.app-shell[data-theme="light"] .scan-run.scan-run-primary {
+  border-color: rgba(37, 99, 235, 0.28) !important;
+  background: linear-gradient(118deg, #397df2, #1d5fd6) !important;
+  color: #ffffff !important;
+  box-shadow: 0 16px 38px rgba(37, 99, 235, 0.22) !important;
+}
+
+html[data-theme="light"] .modal-overlay,
+html[data-theme="light"] .source-picker-scrim,
+html[data-theme="light"] .calendar-popover-scrim,
+html[data-theme="light"] .scan-tour-scrim {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(37, 99, 235, 0.08), transparent 28rem),
+    rgba(207, 220, 236, 0.72) !important;
+  backdrop-filter: blur(16px) saturate(0.96) !important;
+}
+
+html[data-theme="light"] .modal,
+html[data-theme="light"] .compact-dialog,
+html[data-theme="light"] .voc-modal,
+html[data-theme="light"] .source-picker-dialog,
+html[data-theme="light"] .date-range-popover,
+html[data-theme="light"] .scan-tour-card,
+html[data-theme="light"] .command-settings-menu {
+  border-color: rgba(70, 101, 146, 0.24) !important;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(37, 99, 235, 0.075), transparent 24rem),
+    linear-gradient(145deg, rgba(247, 250, 253, 0.98), rgba(226, 236, 247, 0.98)) !important;
+  color: var(--day-text) !important;
+  box-shadow: 0 36px 100px rgba(36, 52, 78, 0.24), var(--day-inner) !important;
+}
+
+html[data-theme="light"] .modal.dossier {
+  background:
+    linear-gradient(180deg, rgba(240, 247, 253, 0.99), rgba(225, 236, 248, 0.99)) !important;
+}
+
+html[data-theme="light"] .dossier-head,
+html[data-theme="light"] .modal .head,
+html[data-theme="light"] .source-picker-head,
+html[data-theme="light"] .source-picker-tools,
+html[data-theme="light"] .source-picker-foot {
+  border-color: rgba(70, 101, 146, 0.18) !important;
+  background: rgba(238, 245, 252, 0.72) !important;
+  color: var(--day-text) !important;
+}
+
+html[data-theme="light"] .dossier-reading,
+html[data-theme="light"] .dossier-rail {
+  border-color: rgba(70, 101, 146, 0.18) !important;
+  background: rgba(235, 242, 249, 0.72) !important;
+}
+
+html[data-theme="light"] .dossier-title,
+html[data-theme="light"] .dossier-section p,
+html[data-theme="light"] .source-coverage-card div,
+html[data-theme="light"] .dossier-strength div,
+html[data-theme="light"] .dossier-tile div {
+  color: var(--day-text) !important;
+}
+
+html[data-theme="light"] .dossier-section h4,
+html[data-theme="light"] .dossier-strength .text-sky-200 {
+  color: #1d5bbf !important;
+}
+
+html[data-theme="light"] .dossier-strength,
+html[data-theme="light"] .source-category-card,
+html[data-theme="light"] .source-option,
+html[data-theme="light"] .source-coverage-card,
+html[data-theme="light"] .dossier-tile,
+html[data-theme="light"] .dossier-feedback {
+  border-color: rgba(70, 101, 146, 0.18) !important;
+  background: rgba(244, 248, 252, 0.76) !important;
+  color: var(--day-text) !important;
+}
+
+html[data-theme="light"] .dossier-hero,
+html[data-theme="light"] .dossier-hero .fallback-visual,
+html[data-theme="light"] .dossier-hero-image,
+html[data-theme="light"] .dossier-image-wrap {
+  background: #101827 !important;
+}
+
+html[data-theme="light"] .x,
+html[data-theme="light"] .modal .x {
+  border-color: rgba(70, 101, 146, 0.18) !important;
+  background: rgba(226, 236, 247, 0.75) !important;
+  color: #33465e !important;
+}
+}

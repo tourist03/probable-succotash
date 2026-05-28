@@ -46,6 +46,18 @@ class NewsSpider(scrapy.Spider):
         "login", "menu", "more", "newsletter", "podcasts", "privacy",
         "search", "see all", "sign in", "subscribe", "terms", "videos",
     }
+    TZINFOS = {
+        "UTC": 0,
+        "GMT": 0,
+        "EST": -5 * 3600,
+        "EDT": -4 * 3600,
+        "CST": -6 * 3600,
+        "CDT": -5 * 3600,
+        "MST": -7 * 3600,
+        "MDT": -6 * 3600,
+        "PST": -8 * 3600,
+        "PDT": -7 * 3600,
+    }
 
     def __init__(self, *args, **kwargs):
         super(NewsSpider, self).__init__(*args, **kwargs)
@@ -444,7 +456,7 @@ class NewsSpider(scrapy.Spider):
         if isinstance(value, datetime):
             return value.replace(tzinfo=None)
         try:
-            return parser.parse(str(value)).replace(tzinfo=None)
+            return parser.parse(str(value), tzinfos=NewsSpider.TZINFOS).replace(tzinfo=None)
         except (ValueError, TypeError, OverflowError):
             return None
 

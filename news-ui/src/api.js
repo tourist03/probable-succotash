@@ -25,6 +25,17 @@ async function jsonFetch(url, opts = {}) {
   return ct.includes('application/json') ? res.json() : res.text();
 }
 
+function normalizeKeywordsForApi(keywords) {
+  if (Array.isArray(keywords)) {
+    return keywords.map(String).map((k) => k.trim()).filter(Boolean);
+  }
+
+  return String(keywords || '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
 // ---------- Briefing / feed ----------
 export const getLatestBriefing = () => jsonFetch('/latest-briefing');
 export const getBriefingMeta   = () => jsonFetch('/briefing/meta');
@@ -64,7 +75,15 @@ export function streamCrawl(params, onEvent) {
 
 // ---------- Train / votes ----------
 export const trainVote = (keywords, summary, vote, title = '') =>
-  jsonFetch('/train', { method:'POST', body: JSON.stringify({ keywords, summary, vote, title }) });
+  jsonFetch('/train', {
+    method: 'POST',
+    body: JSON.stringify({
+      keywords: normalizeKeywordsForApi(keywords),
+      summary: String(summary || title || '').trim(),
+      vote: vote === 'up' ? 'interested' : vote,
+      title: String(title || '').trim(),
+    }),
+  });
 export const correctRegion = (article, region, keywords, reason) =>
   jsonFetch('/region/correct', {
     method: 'POST',
@@ -139,19 +158,106 @@ export const getAnalytics = (key) => {
 };
 
 // ---------- Exports (binary) ----------
+function normalizeSourcesForExport(item) {
+  const rawSources = item.sources || item.source_list || [];
+
+  if (Array.isArray(rawSources) && rawSources.length) {
+    return rawSources.map((source) => {
+      if (typeof source === 'string') return { name: source };
+
+      return {
+        name: source.name || source.title || source.source || 'Unknown',
+      };
+    });
+  }
+
+  return [{ name: item.source || item.src || 'Unknown' }];
+}
+
+function normalizeExportItem(item, index = 0) {
+  const title = String(item.title || `Untitled Signal ${index + 1}`).trim();
+
+  const summary = String(
+    item.master_summary ||
+    item.summary ||
+    item.ppt_summary ||
+    item.snippet ||
+    title
+  ).trim();
+
+  const link = String(
+    item.link ||
+    item.url ||
+    item.source_url ||
+    item.article_url ||
+    '#'
+  ).trim();
+
+  const date = String(
+    item.date ||
+    item.published_at ||
+    item.publishedAt ||
+    item.first_seen ||
+    new Date().toISOString().slice(0, 10)
+  ).slice(0, 10);
+
+  const image = (
+    item.top_image ||
+    item.image_url ||
+    item.image ||
+    item.thumbnail ||
+    item.urlToImage ||
+    ''
+  );
+
+  return {
+    title,
+    master_summary: summary,
+    ppt_summary: String(item.ppt_summary || summary).trim(),
+    snippet: String(item.snippet || summary).trim(),
+    date,
+    link,
+    top_image: image || null,
+    sources: normalizeSourcesForExport(item),
+    importance_score: Number(item.importance_score ?? item.score ?? item.signal_score ?? 50),
+    keywords_found: normalizeKeywordsForApi(item.keywords_found || item.keywords || []),
+    region: item.region || 'Global',
+    full_contents: item.full_contents || item.full_content || '',
+    selected_by: item.selected_by || null,
+    category: item.category || 'Tech News',
+  };
+}
+
 async function exportBinary(path, items, filename) {
+  const payloadItems = Array.isArray(items)
+    ? items.map((item, index) => normalizeExportItem(item, index))
+    : [];
+
+  if (!payloadItems.length) {
+    throw new Error('Export failed: no items selected');
+  }
+
   const res = await fetch(BASE + path, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Sense-Profile': selectedProfile(),
     },
-    body: JSON.stringify({ items, filename }),
+    body: JSON.stringify({
+      items: payloadItems,
+      filename,
+    }),
   });
-  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Export failed: ${res.status} ${res.statusText}: ${body}`);
+  }
+
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
+
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);

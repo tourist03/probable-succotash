@@ -89,11 +89,16 @@ flowchart LR
 
     FastAPI --> Scrapy["Scrapy news_spider"]
     Scrapy --> Sites["sites.json / sites_broadcast.json"]
-    Scrapy --> Raw["ui_results_<job>.json"]
+    Scrapy --> LivePipe["LiveStreamPipeline stdout events"]
+    LivePipe --> LiveBouncer["Inline Bouncer Filter"]
+    LiveBouncer --> Stream["SSE card events while crawl runs"]
+    LiveBouncer --> Raw["ui_results_<job>.json"]
 
-    Raw --> BouncerRaw["Bouncer Raw Filter"]
-    BouncerRaw --> Fusion["semantic_clustering.py"]
-    Fusion --> Stream["Streaming Cards"]
+    Scrapy --> RawFallback["ui_results_<job>.json fallback"]
+    RawFallback --> BouncerRaw["Batch Raw Bouncer Filter"]
+    BouncerRaw --> FusionFallback["semantic_clustering.py fuse_stream fallback"]
+    FusionFallback --> Stream
+    Raw --> Fusion["semantic_clustering.py fuse_cluster"]
     Fusion --> Clustered["clustered_results_<job>.json"]
     Clustered --> BouncerFinal["Bouncer Final Filter"]
     BouncerFinal --> History["Profile History Archive"]
@@ -111,10 +116,10 @@ flowchart LR
 2. React calls FastAPI endpoints.
 3. FastAPI decides the active profile: `default` or `broadcast`.
 4. A manual or scheduled scan runs Scrapy.
-5. Scrapy writes raw article JSON.
-6. The bouncer removes irrelevant articles.
-7. Semantic fusion embeds article text and clusters similar stories.
-8. Events stream to the UI and are archived.
+5. During manual scans, Scrapy can emit each item immediately through `LiveStreamPipeline`.
+6. The backend bounces each live item, streams approved cards to the UI, and keeps a per-job list.
+7. Semantic fusion embeds article text and clusters similar stories into final events.
+8. Final events are archived.
 9. User actions train future filtering.
 
 ---
@@ -225,11 +230,19 @@ This affects analytics display and ownership labels. It does not automatically g
 
 Manual scans are started from the frontend by the `/crawl` endpoint. This endpoint returns Server-Sent Events, so the UI can show live progress and cards as they are prepared.
 
+The current manual flow is intentionally two-stage:
+
+1. **Live discovery stage:** Scrapy emits article items while it is still crawling. The backend runs the bouncer immediately and streams approved cards to the UI.
+2. **Optimization stage:** after crawling finishes, the streamed cards are clustered, deduplicated, scored again, archived, and returned as final data.
+
+This matters because the user no longer has to wait for a long crawl to fully finish before seeing any cards.
+
 ```mermaid
 sequenceDiagram
     participant UI as React UI
     participant API as FastAPI /crawl
     participant SP as Scrapy Spider
+    participant LP as LiveStreamPipeline
     participant B as Bouncer
     participant F as Semantic Engine
     participant H as History
@@ -239,14 +252,21 @@ sequenceDiagram
     API->>API: Check scheduler and capacity
     API-->>UI: SSE job_started
     API->>SP: subprocess scrapy crawl news_spider
-    SP->>SP: RSS-first collection / HTML fallback
-    SP-->>API: writes ui_results_<job_id>.json
-    API->>B: raw bouncer filter
-    API->>F: fuse_stream()
-    loop each raw article
-        F-->>API: lightweight event
-        API-->>UI: SSE card
+    API->>SP: env SENSE_STREAM_ITEMS=1
+    loop while crawler is still running
+        SP->>SP: RSS-first collection / HTML fallback
+        SP->>LP: yield article item
+        LP-->>API: stdout SENSE_STREAM_ITEM:{json}
+        API->>B: bouncer_decision(title, summary, keywords)
+        alt approved / low priority
+            API-->>UI: SSE event: card
+            API->>API: append to live_articles
+        else dropped
+            API->>API: log_dropped_article()
+        end
     end
+    SP-->>API: process exits and/or writes ui_results_<job_id>.json
+    API->>API: write live_articles to ui_results_<job_id>.json
     API->>F: fuse_cluster()
     F-->>API: clustered_results_<job_id>.json
     API->>B: final bouncer filter
@@ -265,13 +285,50 @@ sequenceDiagram
 5. If scheduler is active, the scan is blocked with a clear error.
 6. If too many manual scans are running, the scan is rejected with a capacity error.
 7. Scrapy is launched as a subprocess.
-8. Scrapy writes raw article JSON to `ui_results_<job_id>.json`.
-9. Raw bouncer filter runs.
-10. `MinimalSemanticEngine.fuse_stream()` streams individual cards immediately.
-11. `MinimalSemanticEngine.fuse_cluster()` performs duplicate/event clustering.
-12. Final bouncer filter runs.
-13. Results are archived to the active profile history directory.
-14. Temporary files are cleaned after 300 seconds.
+8. `main.py` sets `SENSE_STREAM_ITEMS=1` so Scrapy's `LiveStreamPipeline` prints each scraped item as a structured stdout line.
+9. `/crawl` watches stdout for `SENSE_STREAM_ITEM:` lines.
+10. Each live item is deduplicated by link/title.
+11. Each live item is immediately checked by `bouncer_decision()`.
+12. Dropped live items are logged to `dropped_articles.json`.
+13. Kept live items are normalized, category-tagged, region-learned, and streamed as named SSE `card` events.
+14. When the crawler finishes, the live approved list is written to `ui_results_<job_id>.json`.
+15. `MinimalSemanticEngine.fuse_cluster()` performs duplicate/event clustering.
+16. Final bouncer filter runs again on clustered events.
+17. Results are archived to the active profile history directory.
+18. Temporary files are cleaned after 300 seconds.
+
+### Manual Scan Fallback Path
+
+If no live items are emitted for any reason, `/crawl` falls back to the older batch path:
+
+```text
+Scrapy output file -> raw bouncer -> fuse_stream card events -> fuse_cluster -> final bouncer -> archive
+```
+
+This keeps Deep Scan usable even if a future spider or pipeline does not emit live item lines.
+
+### Manual History Persistence And Visibility
+
+Manual results are saved, but they are session-scoped:
+
+```text
+intelligence_store/<profile>/history/manual_<session_id>_<timestamp>.json
+```
+
+The frontend creates `session_id` with `getSessionId()` in `news-ui/src/utils/session.js` and stores it in browser `localStorage` under:
+
+```text
+sense-session-id
+```
+
+That means:
+
+- Refreshing the same browser does **not** delete manual history.
+- The same browser/device can reopen its manual archive later.
+- Other users normally do **not** see another user's manual runs in the archive UI because `/history/list` and `/history/range` filter `manual_` files by `session_id`.
+- Scheduled `briefing_*.json` files remain shared by profile.
+
+Current limitation: `GET /history/{filename}` resolves a file by filename and profile. The UI does not reveal another user's manual filename, but direct filename access should be hardened in Phase 2 by validating that `manual_` filenames match the current `session_id`.
 
 ---
 
@@ -379,6 +436,37 @@ Each article item includes:
 - `word_count`
 - `method`
 
+### Live Streaming Pipeline
+
+The Scrapy item pipeline is configured in:
+
+- [news_aggregator/news_aggregator/settings.py](news_aggregator/news_aggregator/settings.py)
+
+```python
+ITEM_PIPELINES = {
+    "news_aggregator.pipelines.LiveStreamPipeline": 100,
+    "news_aggregator.pipelines.NewsAggregatorPipeline": 300,
+}
+```
+
+`LiveStreamPipeline` lives in:
+
+- [news_aggregator/news_aggregator/pipelines.py](news_aggregator/news_aggregator/pipelines.py)
+
+It is only active when the backend launches Scrapy with:
+
+```text
+SENSE_STREAM_ITEMS=1
+```
+
+When active, it prints one UTF-8 JSON line per scraped item:
+
+```text
+SENSE_STREAM_ITEM:{...article json...}
+```
+
+`main.py` reads those stdout lines, bounces the item, and emits a browser SSE `card` event. This keeps the spider independent: it still yields normal Scrapy items and still writes the final `-O ui_results_<job_id>.json` file.
+
 ### RSS-First Strategy
 
 The spider first tries feeds because they are cleaner and faster. If feeds fail or are not present, it discovers likely article links from page structure.
@@ -390,6 +478,16 @@ For non-feed pages:
 - It ignores nav/header/footer/form links.
 - It scores paths with `/news/`, `/article/`, `/story/`, date-like paths, and longer titles.
 - It avoids account, login, tag, author, video, privacy, subscribe, and other non-story URLs.
+
+### Timezone Parsing
+
+The spider has a `TZINFOS` map for common feed abbreviations such as `PDT`, `PST`, `EDT`, `UTC`, and `GMT`. This prevents dateutil warnings like:
+
+```text
+UnknownTimezoneWarning: tzname PDT identified but not understood
+```
+
+The dates are still normalized into the same `YYYY-MM-DD` style used by history and latest-day filtering.
 
 ---
 
@@ -406,6 +504,13 @@ Semantic fusion is handled by [semantic_clustering.py](semantic_clustering.py).
 | Sentiment pipeline | `distilbert-base-uncased-finetuned-sst-2-english` | Simple positive/negative/neutral label |
 | BART summarizer | `local_bart_model` | Optional deeper summary generation |
 | seen registry | `seen_registry.json` | Tracks first-seen links |
+
+`MinimalSemanticEngine` now defaults to `load_summarizer=False`. That means the heavy BART model is not loaded during every manual crawl startup. It is loaded lazily only when deeper summarization is explicitly needed. Shared BART state is protected by:
+
+- `SUMMARY_MODEL_LOCK`
+- `SUMMARY_INFERENCE_LOCK`
+
+This avoids duplicate model loads and keeps simultaneous scans from colliding inside CPU inference.
 
 ### Is This RAG?
 
@@ -454,17 +559,20 @@ Lower distance threshold means stricter clustering. Higher means more stories ma
 
 ### Streaming Mode vs Cluster Mode
 
-There are two phases during manual scans:
+There are two semantic phases available during manual scans:
 
 1. `fuse_stream()`
    - Converts each raw article into a lightweight card.
    - Uses lightweight summaries.
    - Streams quickly to the UI.
+   - Used as a fallback when live spider item streaming is not available.
 
 2. `fuse_cluster()`
    - Re-embeds all articles.
    - Clusters duplicates/similar stories.
    - Produces final optimized results.
+
+In the current preferred manual flow, the first visible cards are streamed before `fuse_stream()` by `/crawl` itself, using Scrapy's live item lines plus the bouncer. `fuse_cluster()` still runs afterward to produce the final optimized result set.
 
 ### Fast Mode
 
@@ -510,6 +618,19 @@ flowchart TD
     Low -->|yes| LowPriority["Keep but mark low_priority"]
     Low -->|no| Normal["Keep"]
 ```
+
+The bouncer is used in three places:
+
+1. **Manual live stage:** each `SENSE_STREAM_ITEM` is bounced before it is allowed to appear in the UI.
+2. **Manual/scheduler raw batch stage:** if a batch output file is used, raw items are filtered before semantic fusion.
+3. **Final stage:** clustered/fused events are filtered again before archive/final data.
+
+The live-stage decision is attached to the streamed card as:
+
+- `bouncer_decision`
+- `bouncer_score`
+- `bouncer_reason`
+- `bouncer_stage = "manual_live"`
 
 ### Thresholds
 
@@ -704,6 +825,39 @@ History endpoints:
 - `GET /history/range`
 - `GET /history/{filename}`
 
+### Archive UI Behavior
+
+The React archive screen uses two history concepts:
+
+1. **Range memory search**
+   - Calls `GET /history/range?from_date=YYYY-MM-DD&to_date=YYYY-MM-DD&session_id=<browser-session>`.
+   - Loads all scheduler briefings in the selected date range.
+   - Also loads only manual runs whose filename starts with the current browser session ID.
+   - Deduplicates by title.
+   - Lets the user filter the loaded archive by text, region, category, source, signal type, image presence, and sort order.
+
+2. **Single run open**
+   - Calls `GET /history/{filename}` when the user clicks a run pill in the archive timeline.
+   - Loads that one retained JSON file into the same card workspace.
+
+### Manual vs Scheduler History
+
+Scheduler archives are shared within the active profile:
+
+```text
+briefing_YYYY-MM-DD_HH-MM-SS.json
+```
+
+Manual archives are browser-session scoped:
+
+```text
+manual_<session_id>_YYYY-MM-DD_HH-MM-SS.json
+```
+
+`/history/list` and `/history/range` intentionally hide manual files unless their prefix matches the requesting `session_id`. This keeps two people from seeing each other's manual search history in normal UI usage.
+
+Phase 2 should harden `GET /history/{filename}` so direct manual filename access also requires a matching `session_id`.
+
 ---
 
 ## 12. Export Engines
@@ -848,11 +1002,14 @@ flowchart TD
 
 - Each manual scan gets its own `job_id`.
 - Each scan writes to unique temp files.
+- Live streamed cards are kept in per-request memory (`live_articles`) and then written to that job's own `ui_results_<job_id>.json`.
+- Scrapy live item emission is opt-in per subprocess via `SENSE_STREAM_ITEMS=1`, so scheduled/background Scrapy behavior is not accidentally changed.
 - Only 3 scans run at once.
 - Scheduler does not start if manual scans are active.
 - Manual scans do not start if scheduler is active.
 - Shared model inference is locked where needed.
 - Shared JSON stores use locks for critical writes.
+- Manual archive visibility is scoped by browser `session_id` in list/range endpoints.
 
 ---
 
@@ -884,6 +1041,8 @@ flowchart TD
 | `history_archive` | Legacy default history. |
 | `intelligence_store/default/history` | Default profile history. |
 | `intelligence_store/broadcast/history` | Broadcast profile history. |
+| `briefing_YYYY-MM-DD_HH-MM-SS.json` | Shared scheduler archive file inside a profile history directory. |
+| `manual_<session_id>_YYYY-MM-DD_HH-MM-SS.json` | Manual Deep Scan archive file scoped to one browser session. |
 | `ui_results_<job_id>.json` | Temporary raw scrape output. |
 | `clustered_results_<job_id>.json` | Temporary semantic fusion output. |
 
@@ -945,9 +1104,9 @@ flowchart TD
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /history/list` | List profile history files. |
-| `GET /history/range` | Merge history between dates. |
-| `GET /history/{filename}` | Load one history file. |
+| `GET /history/list?session_id=...` | List profile history files; scheduler files plus only matching manual session files. |
+| `GET /history/range?from_date=...&to_date=...&session_id=...` | Merge scheduler history and matching manual session history between dates. |
+| `GET /history/{filename}` | Load one history file. Phase 2 should add manual filename/session validation. |
 
 ### Exports
 
@@ -1326,6 +1485,9 @@ news-ui/dist/assets/*
 5. Bouncer quality depends heavily on balanced, consistent feedback.
 6. Scheduler and manual scans are coordinated, but all crawling still happens inside the same app host.
 7. Analytics is IP + key protected, but IP allowlists are only as reliable as the network/proxy headers.
+8. Manual archive list/range endpoints are session-scoped, but direct `GET /history/{filename}` should still be hardened for manual files.
+9. Light mode is intentionally disabled for now because the first pass was not visually consistent enough.
+10. Language translation is still a Settings preview, not a working locale system.
 
 ### Best Future Upgrades
 
@@ -1338,6 +1500,26 @@ news-ui/dist/assets/*
 7. Add health checks for each source feed.
 8. Add model warmup and memory monitoring.
 
+### Phase 2 Commitments
+
+The next planned phase should group three related product-hardening items:
+
+1. **Manual archive access hardening**
+   - Add `session_id` validation to `GET /history/{filename}` for files beginning with `manual_`.
+   - Keep scheduler `briefing_*.json` files shared by profile.
+   - Consider deleting or expiring old manual runs if storage grows.
+
+2. **Light mode v2**
+   - Do not revive the rejected quick white theme.
+   - Build a deliberate, consistent light intelligence-desk palette across homepage, scan, archive, workflow, dossier modal, inputs, cards, and empty states.
+   - Keep dark mode as default.
+
+3. **English/Korean interface translation**
+   - Turn the Settings preview into a real language toggle.
+   - Use a React string catalog first.
+   - Keep language independent from `default` / `broadcast` profile.
+   - Preserve original article titles, source text, and archive evidence unless optional translation is explicitly requested.
+
 ---
 
 ## 21. Korean Language Interface Roadmap
@@ -1347,6 +1529,8 @@ news-ui/dist/assets/*
 The Settings menu exposes a designed preview item labelled `English -> 한국어` with a `Beta soon` tag. It is deliberately not a functioning switch yet. Nothing in the API payloads, scraped news content, bouncer training records, stored archives, or export files is translated by that preview control.
 
 That boundary is important: translated navigation is a user-interface concern, while retrieved headlines and summaries are intelligence evidence and should not be silently altered.
+
+The theme system is similarly conservative right now: dark mode is forced as the active production theme. The rejected light-mode experiment remains disabled and should not be treated as a production implementation.
 
 ### High-Level Delivery Phases
 

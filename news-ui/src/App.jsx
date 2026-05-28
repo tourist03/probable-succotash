@@ -21,6 +21,7 @@ import VocScreen from './screens/VocScreen.jsx';
 import AnalyticsScreen from './screens/AnalyticsScreen.jsx';
 
 const SENSE_ATMOSPHERE_VIDEO = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4';
+const THEME_STORAGE_KEY = 'news-theme';
 
 function ProductAtmosphere({ live }) {
   return (
@@ -51,6 +52,12 @@ export default function App() {
     checked: {},
     logs: [],
   });
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = 'dark';
+    document.documentElement.style.colorScheme = 'dark';
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
+  }, []);
 
   useEffect(() => {
     const hasUnsavedScanState = manualScan.running || manualScan.cards.length > 0;
@@ -158,7 +165,7 @@ export default function App() {
 
   return (
     <DesignViewport>
-      <div className="app-shell min-h-screen text-slate-100">
+      <div className="app-shell min-h-screen text-slate-100" data-theme="dark">
         <ProductAtmosphere live={pathname === '/home'} />
         <TopBar manualScan={manualScan} />
         <main className="design-main mx-auto w-full">

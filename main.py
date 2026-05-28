@@ -780,6 +780,13 @@ def bouncer_check(title, summary, keywords_found=None, profile=DEFAULT_PROFILE):
     return bouncer_decision(title, summary, keywords_found, profile)["keep"]
 
 
+def attach_bouncer_metadata(item, decision):
+    item["bouncer_decision"] = decision.get("decision", "keep")
+    item["bouncer_score"] = decision.get("score")
+    item["bouncer_reason"] = decision.get("reason", "")
+    return item
+
+
 # ==========================================
 # --- DATA MODELS ---
 # ==========================================
@@ -2552,6 +2559,81 @@ async def crawl(
         }
 
     def event_stream():
+        live_item_prefix = "SENSE_STREAM_ITEM:"
+
+        def sse_event(event_name, payload):
+            return (
+                f"event: {event_name}\n"
+                f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            )
+
+        def live_article_key(article):
+            return (
+                str(article.get("link") or article.get("url") or "").strip()
+                or str(article.get("title") or "").strip().lower()
+            )
+
+        def prepare_live_card(raw_article):
+            article = dict(raw_article or {})
+            title = str(article.get("title", "")).strip()
+            summary = get_bouncer_summary_from_item(article)
+            keywords_found = article.get("keywords_found", [])
+
+            decision = bouncer_decision(
+                title,
+                summary,
+                keywords_found,
+                profile=profile,
+            )
+
+            if not decision["keep"]:
+                log_dropped_article(
+                    title,
+                    summary,
+                    keywords_found,
+                    decision,
+                    profile=profile,
+                )
+                return None, decision
+
+            source_name = str(article.get("source") or "Unknown").strip() or "Unknown"
+            article = attach_bouncer_metadata(article, decision)
+            article["profile"] = profile
+            article["bouncer_stage"] = "manual_live"
+            article["master_summary"] = (
+                article.get("master_summary")
+                or article.get("summary")
+                or article.get("snippet")
+                or summary
+                or title
+            )
+            article["ppt_summary"] = article.get("ppt_summary") or article["master_summary"]
+            article["full_contents"] = (
+                article.get("full_contents")
+                or article.get("full_content")
+                or article.get("master_summary")
+                or ""
+            )
+            article["source_count"] = int(article.get("source_count") or 1)
+            article["importance_score"] = int(article.get("importance_score") or 50)
+            article["category"] = assign_category(
+                title,
+                article.get("master_summary", "") or article.get("snippet", ""),
+            )
+
+            if not article.get("sources"):
+                article["sources"] = [
+                    {
+                        "name": source_name,
+                        "link": article.get("link") or article.get("url") or "#",
+                        "date": article.get("date", ""),
+                    }
+                ]
+
+            article.update(apply_learned_region(article, profile))
+
+            return article, decision
+
         if blocked_by_scheduler:
             yield f"data: {json.dumps({'type': 'error', 'message': 'The scheduled briefing is running now. Please start the deep scan again when it completes.'})}\n\n"
             return
@@ -2563,6 +2645,11 @@ async def crawl(
             return
 
         process = None
+        streamed_count = 0
+        live_articles = []
+        live_seen_keys = set()
+        live_dropped_count = 0
+        live_low_priority_count = 0
 
         try:
             with scheduler_lock:
@@ -2586,11 +2673,16 @@ async def crawl(
             ]
             spider_cwd = os.path.join(ROOT_DIR, "news_aggregator")
 
+            process_env = os.environ.copy()
+            process_env["SENSE_STREAM_ITEMS"] = "1"
+            process_env["PYTHONIOENCODING"] = "utf-8"
+
             process = subprocess.Popen(
                 cmd, cwd=spider_cwd,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, bufsize=1, universal_newlines=True,
                 encoding="utf-8", errors="replace",
+                env=process_env,
                 close_fds=CLOSE_FDS,
             )
 
@@ -2598,6 +2690,47 @@ async def crawl(
                 for line in process.stdout:
                     line = line.strip()
                     if not line: continue
+
+                    if line.startswith(live_item_prefix):
+                        try:
+                            raw_article = json.loads(line[len(live_item_prefix):])
+                            key = live_article_key(raw_article)
+
+                            if key and key in live_seen_keys:
+                                continue
+
+                            if key:
+                                live_seen_keys.add(key)
+
+                            live_card, decision = prepare_live_card(raw_article)
+
+                            if live_card:
+                                live_articles.append(live_card)
+                                streamed_count += 1
+
+                                if decision.get("decision") == "low_priority":
+                                    live_low_priority_count += 1
+
+                                if streamed_count == 1:
+                                    yield f"data: {json.dumps({'type': 'status', 'message': 'First bouncer-approved card streamed while crawler is still running.'})}\n\n"
+                                elif streamed_count % 10 == 0:
+                                    yield f"data: {json.dumps({'type': 'status', 'message': f'Live stream: {streamed_count} cards approved so far.'})}\n\n"
+
+                                yield sse_event("card", {"card": live_card})
+                            else:
+                                live_dropped_count += 1
+                                print(
+                                    f"[LIVE-BOUNCER:{profile}] Dropped: "
+                                    f"{str(raw_article.get('title', ''))[:90]} "
+                                    f"(score={decision.get('score')})",
+                                    flush=True,
+                                )
+
+                        except Exception as e:
+                            print(f"[LIVE-STREAM] Item parse/filter error: {e}", flush=True)
+
+                        continue
+
                     sys.stdout.write(f"{line}\n")
                     sys.stdout.flush()
                     if "LOG:" in line:
@@ -2612,7 +2745,13 @@ async def crawl(
             # AI Bouncer
             yield f"data: {json.dumps({'type': 'status', 'message': 'Running AI Gatekeeper...'})}\n\n"
 
-            if os.path.exists(output_file):
+            if live_articles:
+                with open(output_file, "w", encoding="utf-8") as f:
+                    json.dump(live_articles, f, indent=4, ensure_ascii=False)
+
+                yield f"data: {json.dumps({'type': 'status', 'message': f'Live gatekeeper complete. Streamed {len(live_articles)} cards while crawling. Removed {live_dropped_count}. Low priority kept: {live_low_priority_count}.'})}\n\n"
+
+            elif os.path.exists(output_file):
                 try:
                     with open(output_file, "r", encoding="utf-8") as f:
                         raw_data = json.load(f)
@@ -2632,39 +2771,42 @@ async def crawl(
             # ==========================================
             # PHASE 1: STREAM CARDS IN REAL-TIME
             # ==========================================
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Activating Fusion Engine (Streaming Mode)...'})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Activating Fusion Engine...'})}\n\n"
 
             try:
                 from semantic_clustering import MinimalSemanticEngine
                 engine = MinimalSemanticEngine()
 
-                streamed_count = 0
-                for event in engine.fuse_stream(job_id=job_id, fast_mode=False):
-                    event["category"] = assign_category(
-                        event.get("title", ""),
-                        event.get("master_summary", "") or event.get("snippet", ""),
-                    )
-                    event["profile"] = profile
-                    event.update(apply_learned_region(event, profile))
-                    yield f"data: {json.dumps({'type': 'card', 'card': event}, ensure_ascii=False)}\n\n"
-                    streamed_count += 1
-
-                if streamed_count == 0:
-                    yield f"data: {json.dumps({'type': 'status', 'message': 'No articles to process.'})}\n\n"
-                else:
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'All {streamed_count} cards streamed. Optimizing...'})}\n\n"
-
-                # PHASE 2: RE-CLUSTER
-                if streamed_count > 1:
-                    yield f"data: {json.dumps({'type': 'status', 'message': 'Clustering duplicate stories...'})}\n\n"
+                if live_articles:
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Optimizing streamed cards into clustered events...'})}\n\n"
                     engine.fuse_cluster(job_id=job_id, fast_mode=False)
                     yield f"data: {json.dumps({'type': 'status', 'message': 'Optimization complete.'})}\n\n"
                 else:
-                    if os.path.exists(output_file):
-                        with open(output_file, "r", encoding="utf-8") as f:
-                            raw = json.load(f)
-                        with open(cluster_file, "w", encoding="utf-8") as f:
-                            json.dump(raw, f, indent=4, ensure_ascii=False)
+                    for event in engine.fuse_stream(job_id=job_id, fast_mode=False):
+                        event["category"] = assign_category(
+                            event.get("title", ""),
+                            event.get("master_summary", "") or event.get("snippet", ""),
+                        )
+                        event["profile"] = profile
+                        event.update(apply_learned_region(event, profile))
+                        yield sse_event("card", {"card": event})
+                        streamed_count += 1
+
+                    if streamed_count == 0:
+                        yield f"data: {json.dumps({'type': 'status', 'message': 'No articles to process.'})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'type': 'status', 'message': f'All {streamed_count} cards streamed. Optimizing...'})}\n\n"
+
+                    if streamed_count > 1:
+                        yield f"data: {json.dumps({'type': 'status', 'message': 'Clustering duplicate stories...'})}\n\n"
+                        engine.fuse_cluster(job_id=job_id, fast_mode=False)
+                        yield f"data: {json.dumps({'type': 'status', 'message': 'Optimization complete.'})}\n\n"
+                    else:
+                        if os.path.exists(output_file):
+                            with open(output_file, "r", encoding="utf-8") as f:
+                                raw = json.load(f)
+                            with open(cluster_file, "w", encoding="utf-8") as f:
+                                json.dump(raw, f, indent=4, ensure_ascii=False)
 
             except Exception as e:
                 print(f"Fusion streaming error: {e}", flush=True)
@@ -2725,7 +2867,20 @@ async def crawl(
 
             with scheduler_lock:
                 active_jobs[job_id]["status"] = "complete"
-            yield f"data: {json.dumps({'type': 'data', 'results': results, 'job_id': job_id, 'reclustered': True, 'profile': profile})}\n\n"
+
+            if results and streamed_count == 0:
+                for item in results:
+                    yield sse_event("card", {"card": item})
+
+            yield sse_event(
+                "data",
+                {
+                    "results": results,
+                    "job_id": job_id,
+                    "reclustered": True,
+                    "profile": profile,
+                },
+            )
 
         finally:
             if process and process.poll() is None:

@@ -46,6 +46,24 @@ function sortForCarousel(items) {
   });
 }
 
+const HERO_FEED_LIMIT = 5;
+
+function stableSignalKey(item) {
+  return articleKey(item) || item.id || item.title || item.url || item.link || '';
+}
+
+function getHeroFeed(items) {
+  const topClustered = sortForCarousel(
+    items.filter((item) => (item.source_count || 1) > 1)
+  ).slice(0, HERO_FEED_LIMIT);
+
+  if (topClustered.length) {
+    return topClustered;
+  }
+
+  return sortForCarousel(items).slice(0, HERO_FEED_LIMIT);
+}
+
 function matchesQuery(item, query) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
@@ -85,9 +103,8 @@ function topKeywords(items, limit = 5) {
 }
 
 function TopClusterCarousel({ articles, onOpen, onSelect }) {
-  const multiSource = useMemo(() => sortForCarousel(articles.filter((item) => (item.source_count || 1) > 1)), [articles]);
-  const slides = multiSource.length ? multiSource : sortForCarousel(articles).slice(0, 5);
-  const fallbackMode = multiSource.length === 0;
+  const slides = useMemo(() => articles.slice(0, HERO_FEED_LIMIT), [articles]);
+  const fallbackMode = slides.every((item) => (item.source_count || 1) <= 1);
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -175,40 +192,139 @@ function TopClusterCarousel({ articles, onOpen, onSelect }) {
 }
 
 function KoreanMarketUpdate({ articles }) {
-  const samsungMentions = articles.filter((item) => `${item.title} ${item.summary} ${(item.keywords || []).join(' ')}`.toLowerCase().includes('samsung')).length;
-  const displayMentions = articles.filter((item) => `${item.title} ${item.summary} ${item.category}`.toLowerCase().match(/display|oled|semiconductor|chip/)).length;
+  const samsungMentions = articles.filter((item) =>
+    `${item.title} ${item.summary} ${(item.keywords || []).join(' ')}`
+      .toLowerCase()
+      .includes('samsung')
+  ).length;
+
+  const displayMentions = articles.filter((item) =>
+    `${item.title} ${item.summary} ${item.category}`
+      .toLowerCase()
+      .match(/display|oled|semiconductor|chip/)
+  ).length;
+
   const keywords = topKeywords(articles, 3).map((k) => k.k).join(', ') || 'Korean technology';
 
-  // Placeholder market values for visual layout only. Replace with a live Korean market API when available.
-  const rows = [
-    ['Samsung Electronics', '₩78,400', '+1.4%'],
-    ['KOSPI', '2,742.18', '+0.3%'],
-    ['KOSDAQ', '871.42', '-0.2%'],
-  ];
+  const market = {
+    label: 'Samsung Electronics',
+    ticker: '005930.KS',
+    value: '₩78,400',
+    delta: '+1.4%',
+    open: '₩77,400',
+    high: '₩78,900',
+    low: '₩77,100',
+    volume: '18.2M',
+    trend: [77400, 77650, 77380, 77920, 78150, 78040, 78320, 78620, 78510, 78900, 78400],
+  };
+
+  const min = Math.min(...market.trend);
+  const max = Math.max(...market.trend);
+  const range = max - min || 1;
+
+  const points = market.trend
+    .map((price, index) => {
+      const x = (index / (market.trend.length - 1)) * 100;
+      const y = 44 - ((price - min) / range) * 32;
+      return `${x},${y}`;
+    })
+    .join(' ');
+
+  const areaPoints = `0,52 ${points} 100,52`;
 
   return (
     <aside className="market-panel cockpit-top-card flex flex-col overflow-hidden rounded-[26px] p-5 shadow-cockpit backdrop-blur-xl 2xl:p-6">
       <div className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">
         <span className="flex items-center gap-2">
-        <Icon name="trend" size={14} /> Korean Market Update
+          <Icon name="trend" size={14} /> Korean Market Update
         </span>
-        <span className="market-preview-tag">Preview</span>
+
+        <span className="rounded-full border border-sky-300/30 bg-sky-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-100">
+          Preview
+        </span>
       </div>
-      <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-hidden">
-        {rows.map(([label, value, delta]) => (
-          <div key={label} className="market-row">
-            <div className="text-[13px] font-semibold text-slate-400">{label}</div>
-            <div className="mt-2 flex items-baseline justify-between gap-3">
-              <span className="text-xl font-semibold text-white">{value}</span>
-              <span className={delta.startsWith('-') ? 'text-sm font-bold text-rose-600' : 'text-sm font-bold text-emerald-600'}>{delta}</span>
+
+      <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {market.ticker}
+              </div>
+
+              <div className="mt-1 text-sm font-semibold text-slate-300">
+                {market.label}
+              </div>
+            </div>
+
+            <div className="text-right">
+              <div className="text-2xl font-semibold text-white">{market.value}</div>
+              <div className="mt-1 text-sm font-bold text-emerald-400">{market.delta}</div>
             </div>
           </div>
-        ))}
+
+          <svg
+            viewBox="0 0 100 54"
+            preserveAspectRatio="none"
+            className="mt-4 block h-36 w-full 2xl:h-40"
+            role="img"
+            aria-label="Samsung Electronics preview chart"
+          >
+            <defs>
+              <linearGradient id="samsungMarketFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="rgba(56, 189, 248, 0.34)" />
+                <stop offset="100%" stopColor="rgba(56, 189, 248, 0.02)" />
+              </linearGradient>
+            </defs>
+
+            <line x1="0" y1="12" x2="100" y2="12" stroke="rgba(148, 163, 184, 0.18)" strokeWidth="0.5" />
+            <line x1="0" y1="28" x2="100" y2="28" stroke="rgba(148, 163, 184, 0.18)" strokeWidth="0.5" />
+            <line x1="0" y1="44" x2="100" y2="44" stroke="rgba(148, 163, 184, 0.18)" strokeWidth="0.5" />
+
+            <polygon points={areaPoints} fill="url(#samsungMarketFill)" />
+
+            <polyline
+              points={points}
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs 2xl:grid-cols-4">
+            <div className="rounded-xl bg-black/20 p-2">
+              <div className="text-slate-500">Open</div>
+              <div className="mt-1 font-semibold text-slate-100">{market.open}</div>
+            </div>
+
+            <div className="rounded-xl bg-black/20 p-2">
+              <div className="text-slate-500">High</div>
+              <div className="mt-1 font-semibold text-slate-100">{market.high}</div>
+            </div>
+
+            <div className="rounded-xl bg-black/20 p-2">
+              <div className="text-slate-500">Low</div>
+              <div className="mt-1 font-semibold text-slate-100">{market.low}</div>
+            </div>
+
+            <div className="rounded-xl bg-black/20 p-2">
+              <div className="text-slate-500">Volume</div>
+              <div className="mt-1 font-semibold text-slate-100">{market.volume}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3 text-xs leading-relaxed text-slate-400">
+          Samsung moved higher while Korean tech indices remained stable. Display and semiconductor-related signals are{' '}
+          {displayMentions || samsungMentions ? 'elevated' : 'steady'} in today&apos;s briefing, with context around {keywords}.
+        </div>
+
+        <div className="mt-3 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+          Demonstration values · live market provider pending
+        </div>
       </div>
-      <div className="market-note">
-        Samsung moved higher while Korean tech indices remained stable. Display and semiconductor-related signals are {displayMentions || samsungMentions ? 'elevated' : 'steady'} in today&apos;s briefing, with context around {keywords}.
-      </div>
-      <div className="mt-3 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Demonstration values · live market provider pending</div>
     </aside>
   );
 }
@@ -249,16 +365,28 @@ function BriefingStream({ articles, onOpen, navigate }) {
   );
 }
 
-function LatestDaySignals({ articles, onOpen }) {
+function LatestDaySignals({ articles, excludeKeys, onOpen }) {
   const [start, setStart] = useState(0);
   const [paused, setPaused] = useState(false);
-  const latest = latestDate(articles);
-  const items = useMemo(
-    () => sortByDate(articles.filter((item) => item.date === latest)),
-    [articles, latest]
+
+  const availableArticles = useMemo(
+    () => articles.filter((item) => {
+      const key = stableSignalKey(item);
+      return !key || !excludeKeys.has(key);
+    }),
+    [articles, excludeKeys]
   );
+
+  const latest = latestDate(availableArticles);
+
+  const items = useMemo(
+    () => sortByDate(availableArticles.filter((item) => item.date === latest)),
+    [availableArticles, latest]
+  );
+
   const canMove = items.length > 5;
   const visibleCount = Math.min(5, items.length);
+
   const visible = canMove
     ? Array.from({ length: visibleCount }, (_, offset) => items[(start + offset) % items.length])
     : items.slice(0, visibleCount);
@@ -269,7 +397,12 @@ function LatestDaySignals({ articles, onOpen }) {
 
   useEffect(() => {
     if (!canMove || paused) return undefined;
-    const timer = setInterval(() => setStart((position) => (position + 1) % items.length), 30000);
+
+    const timer = setInterval(
+      () => setStart((position) => (position + 1) % items.length),
+      30000
+    );
+
     return () => clearInterval(timer);
   }, [canMove, items.length, paused]);
 
@@ -285,20 +418,37 @@ function LatestDaySignals({ articles, onOpen }) {
     >
       <div className="mb-3 flex items-center justify-between gap-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Latest Day Signals</div>
-          <div className="mt-1 text-sm text-slate-500">{latest} · {items.length} signals</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">
+            Latest Day Signals
+          </div>
+          <div className="mt-1 text-sm text-slate-500">
+            {latest} · {items.length} signals
+          </div>
         </div>
+
         {canMove && (
           <div className="flex gap-2">
-            <button className="carousel-control" onClick={() => move(-1)} type="button" aria-label="Previous signals">
+            <button
+              className="carousel-control"
+              onClick={() => move(-1)}
+              type="button"
+              aria-label="Previous signals"
+            >
               <Icon name="chevL" />
             </button>
-            <button className="carousel-control" onClick={() => move(1)} type="button" aria-label="Next signals">
+
+            <button
+              className="carousel-control"
+              onClick={() => move(1)}
+              type="button"
+              aria-label="Next signals"
+            >
               <Icon name="chevR" />
             </button>
           </div>
         )}
       </div>
+
       <div className="latest-day-grid grid auto-cols-[minmax(160px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 md:grid-flow-row md:grid-cols-5 md:overflow-visible md:pb-0">
         {visible.map((item) => (
           <button
@@ -308,17 +458,30 @@ function LatestDaySignals({ articles, onOpen }) {
             type="button"
           >
             <SignalVisual item={item} className="visual-layer z-0" label={false} />
-            <div className="absolute inset-0 z-10 bg-gradient-to-t from-[#050914]/86 via-[#050914]/28 to-black/0" />
-            <div className="relative z-20 flex h-full min-h-0 flex-col justify-end p-3">
-              <div className="mb-auto flex justify-end">
+
+            <div className="absolute inset-0 z-10 bg-gradient-to-t from-black via-[#050914]/75 to-transparent" />
+
+            <div className="relative z-20 flex h-full min-h-0 flex-col justify-between p-3">
+              <div className="flex justify-end">
                 {(scoreOf(item) >= 80 || item.is_fresh) && (
-                  <span className="signal-chip selected">{scoreOf(item) >= 80 ? 'High Signal' : 'New'}</span>
+                  <span className="signal-chip selected">
+                    {scoreOf(item) >= 80 ? 'High Signal' : 'New'}
+                  </span>
                 )}
               </div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100">
-                {item.source_count || 1} sources · {item.region || 'Global'} · {item.category || 'News'}
+
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.75)]">
+                  {item.source_count || 1} sources · {item.region || 'Global'} · {item.category || 'News'}
+                </div>
+
+                <div
+                  className="mt-1 line-clamp-2 min-h-[38px] text-sm font-semibold leading-snug text-white drop-shadow-[0_3px_12px_rgba(0,0,0,0.95)] group-hover:text-sky-50"
+                  title={item.title}
+                >
+                  {item.title}
+                </div>
               </div>
-              <div className="mt-1 line-clamp-3 text-sm font-semibold leading-snug text-slate-100 group-hover:text-white">{item.title}</div>
             </div>
           </button>
         ))}
@@ -514,6 +677,11 @@ export default function FeedScreen() {
     () => applyFilters(articles, filters, selectedIds),
     [articles, filters, selectedIds]
   );
+  const heroFeed = useMemo(() => getHeroFeed(articles), [articles]);
+  const heroFeedKeys = useMemo(
+    () => new Set(heroFeed.map(stableSignalKey).filter(Boolean)),
+    [heroFeed]
+  );
   const groups = useMemo(() => groupedByDate(filteredArticles), [filteredArticles]);
   const selectedBatch = useMemo(
     () => articles.filter((item) => checked[articleKey(item)]),
@@ -535,7 +703,12 @@ export default function FeedScreen() {
         setArticles((arr) => arr.filter((a) => a.id !== item.id));
         setHiddenCount((n) => n + 1);
       } else if (v === 'up') {
-        await trainVote(item.keywords?.join(',') || '', item.summary || item.title, 'up', item.title);
+        await trainVote(
+          item.keywords_found || item.keywords || [],
+          item.master_summary || item.summary || item.title,
+          'interested',
+          item.title
+        );
       }
     } catch {
       /* keep UI optimistic */
@@ -638,7 +811,7 @@ export default function FeedScreen() {
       <section className="briefing-stage grid gap-4 2xl:gap-5">
         <div className="briefing-top-row grid min-h-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(230px,1fr)_minmax(230px,1fr)] 2xl:gap-5">
           <TopClusterCarousel
-            articles={articles}
+            articles={heroFeed}
             onOpen={setOpen}
             onSelect={setPendingSelect}
           />
@@ -646,7 +819,11 @@ export default function FeedScreen() {
           <BriefingStream articles={articles} onOpen={setOpen} navigate={navigate} />
         </div>
 
-        <LatestDaySignals articles={articles} onOpen={setOpen} />
+        <LatestDaySignals
+          articles={articles}
+          excludeKeys={heroFeedKeys}
+          onOpen={setOpen}
+        />
       </section>
 
       <SearchLoadedBriefing

@@ -1,16 +1,26 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-import ArticleCard, { SignalVisual } from '../components/ArticleCard.jsx';
+import ArticleCard from '../components/ArticleCard.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import DateRangePicker from '../components/DateRangePicker.jsx';
-import { correctRegion, getHistoryFile, getHistoryList } from '../api.js';
+import { correctRegion, getHistoryFile, getHistoryList, getHistoryRange } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
-import { cardVariant, groupedByDate, scoreOf } from '../utils/intelligence.js';
+import { cardVariant, groupedByDate, publishedTime, scoreOf } from '../utils/intelligence.js';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
+const EMPTY_FILTERS = {
+  text: '',
+  category: 'all',
+  region: 'all',
+  source: 'all',
+  signal: 'all',
+  image: 'all',
+  sort: 'date_desc',
+};
+
 function dateAddDays(dateStr, delta) {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + delta);
   return d.toISOString().slice(0, 10);
 }
@@ -21,6 +31,7 @@ function parseRun(file) {
   const date = match?.[1] || TODAY;
   const time = match ? `${match[2]}:${match[3]}` : '00:00';
   const d = new Date(`${date}T${time}:00`);
+
   return {
     ...file,
     date,
@@ -28,75 +39,101 @@ function parseRun(file) {
     timestamp: Number.isNaN(d.getTime()) ? 0 : d.getTime(),
     label: Number.isNaN(d.getTime())
       ? file.display || filename
-      : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+      : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`,
   };
 }
 
-function groupRuns(runs) {
-  return runs.reduce((acc, run) => {
-    const d = new Date(`${run.date}T00:00:00`);
-    const key = Number.isNaN(d.getTime())
-      ? 'Unknown'
-      : d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(run);
-    return acc;
-  }, {});
+function uniqueSorted(values) {
+  return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 }
 
-function topKeywords(items) {
+function topKeywords(items, limit = 5) {
   const map = new Map();
-  items.forEach((item) => (item.keywords || []).forEach((k) => map.set(k, (map.get(k) || 0) + 1)));
-  return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k]) => k);
+
+  items.forEach((item) => {
+    (item.keywords || []).forEach((keyword) => {
+      map.set(keyword, (map.get(keyword) || 0) + 1);
+    });
+  });
+
+  return [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([keyword]) => keyword);
 }
 
-function runSummary(items) {
+function metricSummary(items) {
   return {
-    articles: items.length,
-    clusters: items.filter((item) => (item.source_count || 1) > 1).length,
+    total: items.length,
     high: items.filter((item) => scoreOf(item) >= 80).length,
-    keywords: topKeywords(items).slice(0, 3),
+    clustered: items.filter((item) => (item.source_count || 1) > 1).length,
+    sources: uniqueSorted(items.map((item) => item.src)).length,
   };
 }
 
-function ArchiveMosaic({ items, onOpen }) {
-  const lead = [...items].sort((a, b) => scoreOf(b) - scoreOf(a))[0];
-  const support = items.filter((a) => a.id !== lead?.id).sort((a, b) => scoreOf(b) - scoreOf(a)).slice(0, 3);
-  if (!lead) return null;
+function matchesText(item, text) {
+  const q = text.trim().toLowerCase();
+  if (!q) return true;
+
+  return [
+    item.title,
+    item.summary,
+    item.src,
+    item.category,
+    item.region,
+    ...(item.keywords || []),
+  ].join(' ').toLowerCase().includes(q);
+}
+
+function applyArchiveFilters(items, filters) {
+  const filtered = items.filter((item) => {
+    if (!matchesText(item, filters.text)) return false;
+    if (filters.category !== 'all' && item.category !== filters.category) return false;
+    if (filters.region !== 'all' && item.region !== filters.region) return false;
+    if (filters.source !== 'all' && item.src !== filters.source) return false;
+
+    if (filters.signal === 'high' && scoreOf(item) < 80) return false;
+    if (filters.signal === 'clustered' && (item.source_count || 1) <= 1) return false;
+    if (filters.signal === 'single' && (item.source_count || 1) > 1) return false;
+    if (filters.signal === 'fresh' && !item.is_fresh) return false;
+
+    if (filters.image === 'with' && !item.image_url) return false;
+    if (filters.image === 'without' && item.image_url) return false;
+
+    return true;
+  });
+
+  return [...filtered].sort((a, b) => {
+    if (filters.sort === 'score_desc') return scoreOf(b) - scoreOf(a);
+    if (filters.sort === 'sources_desc') return (b.source_count || 1) - (a.source_count || 1);
+    if (filters.sort === 'title_asc') return a.title.localeCompare(b.title);
+    return publishedTime(b) - publishedTime(a);
+  });
+}
+
+function ArchiveRunStrip({ runs, activeRunLabel, onOpenRun }) {
+  if (!runs.length) return null;
 
   return (
-    <section className="space-y-4">
-      <button
-        className="group relative block min-h-[360px] w-full overflow-hidden rounded-[28px] border border-amber-300/20 bg-[#101827] text-left shadow-cockpit"
-        onClick={() => onOpen(lead)}
-        type="button"
-      >
-        <SignalVisual item={lead} className="visual-layer" label={false} />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-[#070b14]/55 to-transparent" />
-        <div className="relative flex min-h-[360px] flex-col justify-end p-7">
-          <div className="mb-4 flex flex-wrap gap-2">
-            <span className="signal-chip selected">Archived Lead Signal</span>
-            <span className="source-chip">Score {scoreOf(lead)}</span>
-            <span className="source-chip">{lead.source_count || 1} sources</span>
-          </div>
-          <h2 className="max-w-4xl text-3xl font-semibold leading-tight text-white sm:text-5xl">{lead.title}</h2>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300">{lead.summary}</p>
+    <section className="archive-run-strip">
+      <div className="archive-strip-head">
+        <div>
+          <div className="eyebrow archive-accent">Run Timeline</div>
+          <p>Open a single archived run, or keep the combined range search loaded above.</p>
         </div>
-      </button>
-      <div className="grid gap-4 md:grid-cols-3">
-        {support.map((item) => (
+        <span>{runs.length} run{runs.length === 1 ? '' : 's'}</span>
+      </div>
+
+      <div className="archive-strip-scroll">
+        {runs.slice(0, 18).map((run) => (
           <button
-            key={item.id}
-            className="relative min-h-[190px] overflow-hidden rounded-[22px] border border-white/10 bg-[#101827] p-4 text-left transition hover:border-amber-300/25"
-            onClick={() => onOpen(item)}
+            key={run.filename}
+            className={activeRunLabel === run.label ? 'archive-run-pill active' : 'archive-run-pill'}
+            onClick={() => onOpenRun(run)}
             type="button"
           >
-            <SignalVisual item={item} className="visual-layer" label={false} />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#070b14]/92 via-[#070b14]/50 to-transparent" />
-            <div className="relative z-10 flex h-full flex-col justify-end">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100">Score {scoreOf(item)} · {item.source_count || 1} sources</div>
-              <div className="mt-2 line-clamp-3 text-base font-semibold text-slate-100">{item.title}</div>
-            </div>
+            <span className="archive-run-time">{run.time}</span>
+            <span className="archive-run-type">{run.type === 'scheduler' ? 'Scheduler' : 'Manual'}</span>
           </button>
         ))}
       </div>
@@ -107,224 +144,310 @@ function ArchiveMosaic({ items, onOpen }) {
 export default function HistoryScreen() {
   const [from, setFrom] = useState(dateAddDays(TODAY, -6));
   const [to, setTo] = useState(TODAY);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [articles, setArticles] = useState([]);
   const [runs, setRuns] = useState([]);
-  const [loading, setLoad] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
-  const [openRun, setOpenRun] = useState(null);
-  const [runItems, setRunItems] = useState([]);
-  const [runLoading, setRunLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [activeRunLabel, setActiveRunLabel] = useState('');
   const [openArticle, setOpenArticle] = useState(null);
-  const [runMetrics, setRunMetrics] = useState({});
-  const [expandedDays, setExpandedDays] = useState({});
 
-  const refresh = () => {
-    setLoad(true);
-    setErr('');
-    setExpandedDays({});
-    getHistoryList()
-      .then(async (list) => {
-        const archiveRuns = (Array.isArray(list) ? list : [])
-          .filter((file) => String(file.filename || '').endsWith('.json'))
-          .map(parseRun)
-          .filter((run) => run.date >= from && run.date <= to)
-          .sort((a, b) => b.timestamp - a.timestamp);
-        setRuns(archiveRuns);
-        const summaries = await Promise.all(archiveRuns.map(async (run) => {
-          try {
-            const data = await getHistoryFile(run.filename);
-            const items = normalizeList(data?.results || data?.articles || data || []);
-            return [run.filename, runSummary(items)];
-          } catch {
-            return [run.filename, null];
-          }
-        }));
-        setRunMetrics(Object.fromEntries(summaries));
-      })
-      .catch((e) => setErr(e.message || String(e)))
-      .finally(() => setLoad(false));
+  const updateFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
   };
 
-  useEffect(refresh, [from, to]);
+  const resetFilters = () => setFilters({ ...EMPTY_FILTERS });
 
-  const openBriefing = async (run) => {
-    setOpenRun(run);
-    setRunItems([]);
-    setRunLoading(true);
+  const loadArchiveRange = async (nextFrom = from, nextTo = to) => {
+    setLoading(true);
+    setErr('');
+    setSearched(true);
+    setActiveRunLabel('');
+
+    try {
+      const [rangeData, runList] = await Promise.all([
+        getHistoryRange(nextFrom, nextTo),
+        getHistoryList(),
+      ]);
+
+      const rangeItems = normalizeList(
+        rangeData?.results || rangeData?.articles || rangeData?.result || []
+      );
+
+      const archiveRuns = (Array.isArray(runList) ? runList : [])
+        .filter((file) => String(file.filename || '').endsWith('.json'))
+        .map(parseRun)
+        .filter((run) => run.date >= nextFrom && run.date <= nextTo)
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+      setArticles(rangeItems);
+      setRuns(archiveRuns);
+    } catch (error) {
+      setErr(error.message || String(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadArchiveRange();
+  }, []);
+
+  const setPreset = (days) => {
+    const nextFrom = dateAddDays(TODAY, -(days - 1));
+    const nextTo = TODAY;
+    setFrom(nextFrom);
+    setTo(nextTo);
+    loadArchiveRange(nextFrom, nextTo);
+  };
+
+  const openRun = async (run) => {
+    setLoading(true);
+    setErr('');
+    setActiveRunLabel(run.label);
+
     try {
       const data = await getHistoryFile(run.filename);
-      setRunItems(normalizeList(data?.results || data?.articles || data || []));
+      setArticles(normalizeList(data?.results || data?.articles || data || []));
+      resetFilters();
+    } catch (error) {
+      setErr(error.message || String(error));
     } finally {
-      setRunLoading(false);
+      setLoading(false);
     }
   };
 
   const onCorrectRegion = async (item, correction) => {
     const result = await correctRegion(item, correction.region, correction.keywords, correction.reason);
     const patch = { region: result.region, region_basis: 'User corrected' };
-    setRunItems((arr) => arr.map((article) => (article.title === item.title ? { ...article, ...patch } : article)));
+
+    setArticles((items) => items.map((article) => (
+      article.title === item.title ? { ...article, ...patch } : article
+    )));
     setOpenArticle((article) => (article?.title === item.title ? { ...article, ...patch } : article));
+
     return result;
   };
 
-  const runGroups = useMemo(() => groupRuns(runs), [runs]);
-  useEffect(() => {
-    const mostRecentDay = Object.keys(runGroups)[0];
-    if (mostRecentDay) {
-      setExpandedDays((current) => (Object.keys(current).length ? current : { [mostRecentDay]: true }));
-    }
-  }, [runGroups]);
-  const archiveTotals = useMemo(() => Object.values(runMetrics).filter(Boolean).reduce((totals, summary) => ({
-    articles: totals.articles + summary.articles,
-    high: totals.high + summary.high,
-  }), { articles: 0, high: 0 }), [runMetrics]);
-  const totalArticles = runItems.length;
-  const highSignals = runItems.filter((a) => scoreOf(a) >= 80).length;
-  const articleGroups = useMemo(() => groupedByDate(runItems), [runItems]);
-  const keywords = topKeywords(runItems);
+  const options = useMemo(() => ({
+    categories: uniqueSorted(articles.map((item) => item.category)),
+    regions: uniqueSorted(articles.map((item) => item.region)),
+    sources: uniqueSorted(articles.map((item) => item.src)),
+  }), [articles]);
 
-  if (openRun) {
-    return (
-      <div className="workflow-page archive-page space-y-6">
-        <section className="workflow-console archive-snapshot-console">
-          <button className="btn-dark-secondary mb-5" onClick={() => setOpenRun(null)} type="button">
-            <Icon name="chevL" /> Back to Archive
-          </button>
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="eyebrow archive-accent">Archived Briefing</div>
-              <h1 className="mt-2 text-3xl font-semibold text-white sm:text-5xl">{openRun.label}</h1>
-              <p className="mt-3 text-slate-400">Historical snapshot · {totalArticles} articles · {highSignals} high-signal items</p>
-            </div>
-            <div className="flex flex-wrap gap-2">{keywords.map((k) => <span className="signal-chip selected" key={k}>{k}</span>)}</div>
-          </div>
-        </section>
+  const filteredArticles = useMemo(
+    () => applyArchiveFilters(articles, filters),
+    [articles, filters],
+  );
 
-        {runLoading ? (
-          <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
-            <h2 className="text-xl font-semibold text-white">Opening archived briefing</h2>
-          </div>
-        ) : (
-          <>
-            <ArchiveMosaic items={runItems} onOpen={setOpenArticle} />
-            <section className="space-y-8">
-              {Object.entries(articleGroups).map(([day, items]) => (
-                <div key={day} className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-semibold text-white">{day}</h2>
-                    <div className="h-px flex-1 bg-white/10" />
-                    <span className="text-sm text-slate-500">{items.length} archived signals</span>
-                  </div>
-                  <div className="article-grid grid gap-8 2xl:grid-cols-2">
-                    {items.map((item) => (
-                      <ArticleCard key={item.id} item={item} variant={cardVariant(item)} onOpen={setOpenArticle} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </section>
-          </>
-        )}
-        <ArticleModal item={openArticle} onClose={() => setOpenArticle(null)} onCorrectRegion={onCorrectRegion} />
-      </div>
-    );
-  }
+  const loadedMetrics = useMemo(() => metricSummary(articles), [articles]);
+  const visibleMetrics = useMemo(() => metricSummary(filteredArticles), [filteredArticles]);
+  const articleGroups = useMemo(() => groupedByDate(filteredArticles), [filteredArticles]);
+  const keywords = topKeywords(articles, 6);
 
   return (
-    <div className="workflow-page archive-page space-y-6">
-      <section className="workflow-console archive-console">
-        <div className="archive-console-copy">
+    <div className="workflow-page archive-page archive-search-page space-y-6">
+      <form
+        className="archive-search-console"
+        onSubmit={(event) => {
+          event.preventDefault();
+          loadArchiveRange();
+        }}
+      >
+        <section className="archive-search-hero">
           <div>
-            <div className="eyebrow">Briefing Archive / Run History</div>
-            <h1>Browse past briefings.</h1>
-            <p>Retrieve briefing snapshots by date and open individual scheduler or retained manual runs when available.</p>
+            <div className="eyebrow archive-accent">Briefing Archive / Memory Search</div>
+            <h1>Search archived intelligence.</h1>
+            <p>
+              Load every retained briefing signal in a date range, then filter the loaded archive
+              by keyword, category, source, region, score, and image coverage.
+            </p>
           </div>
-        </div>
-        <aside className="archive-fetch-panel">
-          <div className="workflow-status-head"><span className="workflow-beacon archive" /> Archive Range</div>
-          <DateRangePicker
-            from={from}
-            to={to}
-            label="Date Range"
-            onChange={({ from: nextFrom, to: nextTo }) => {
-              setFrom(nextFrom);
-              setTo(nextTo);
-            }}
-          />
-          <button className="btn-dark-primary h-11 justify-center" onClick={refresh} type="button"><Icon name="refresh" /> Fetch Briefings</button>
-        </aside>
-      </section>
 
-      <section className="workflow-metric-row archive">
-        <div className="workflow-metric"><Icon name="calendar" /><span>Dates loaded</span><strong>{Object.keys(runGroups).length}</strong></div>
-        <div className="workflow-metric"><Icon name="history" /><span>Briefing runs</span><strong>{runs.length}</strong></div>
-        <div className="workflow-metric"><Icon name="layers" /><span>Total signals</span><strong>{archiveTotals.articles}</strong></div>
-        <div className="workflow-metric"><Icon name="trend" /><span>High signal</span><strong>{archiveTotals.high}</strong></div>
-      </section>
+          <div className="archive-memory-meter">
+            <span>Loaded Workspace</span>
+            <strong>{loadedMetrics.total}</strong>
+            <small>{from} &rarr; {to}</small>
+          </div>
+        </section>
 
-      {loading ? (
-        <div className="workflow-empty archive"><Icon name="refresh" size={25} /><h2>Loading archive</h2></div>
-      ) : err ? (
-        <div className="rounded-[24px] border border-red-300/20 bg-red-950/20 p-10 text-center"><h2 className="text-xl font-semibold text-white">Failed to load archive</h2><p className="mt-2 text-red-200">{err}</p></div>
-      ) : runs.length === 0 ? (
-        <div className="workflow-empty archive">
-          <Icon name="archive" size={27} />
-          <h2 className="text-xl font-semibold text-white">No scheduler briefings found for this date range.</h2>
-          <p className="mt-2 text-slate-400">Try expanding the range.</p>
-        </div>
-      ) : (
-        <section className="space-y-8">
-          {Object.entries(runGroups).map(([day, group]) => (
-            <div key={day} className="archive-day">
+        <section className="archive-query-panel">
+          <div className="archive-range-row">
+            <DateRangePicker
+              from={from}
+              to={to}
+              label="Archive Date Range"
+              helpText="Choose the retained briefing dates to load into this archive workspace."
+              onChange={({ from: nextFrom, to: nextTo }) => {
+                setFrom(nextFrom);
+                setTo(nextTo);
+              }}
+            />
+
+            <div className="archive-preset-group" aria-label="Archive presets">
+              <button className="source-chip" onClick={() => setPreset(1)} type="button">Today</button>
+              <button className="source-chip" onClick={() => setPreset(7)} type="button">7 days</button>
+              <button className="source-chip" onClick={() => setPreset(30)} type="button">30 days</button>
+            </div>
+
+            <button className="btn-dark-primary archive-fetch-button" type="submit">
+              <Icon name="search" /> Search Archive
+            </button>
+          </div>
+
+          <div className="archive-inline-search">
+            <Icon name="search" size={18} />
+            <input
+              value={filters.text}
+              onChange={(event) => updateFilter('text', event.target.value)}
+              placeholder="Search loaded archive by title, summary, source, keyword..."
+            />
+            {filters.text && (
               <button
-                className="archive-day-toggle"
-                onClick={() => setExpandedDays((current) => ({ ...current, [day]: !current[day] }))}
+                className="archive-clear-search"
+                onClick={() => updateFilter('text', '')}
+                type="button"
+                aria-label="Clear archive search"
+              >
+                <Icon name="x" size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="archive-filter-grid">
+            <select className="dark-input" value={filters.region} onChange={(event) => updateFilter('region', event.target.value)}>
+              <option value="all">All Regions</option>
+              {options.regions.map((region) => <option key={region} value={region}>{region}</option>)}
+            </select>
+
+            <select className="dark-input" value={filters.category} onChange={(event) => updateFilter('category', event.target.value)}>
+              <option value="all">All Categories</option>
+              {options.categories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+
+            <select className="dark-input" value={filters.source} onChange={(event) => updateFilter('source', event.target.value)}>
+              <option value="all">All Sources</option>
+              {options.sources.map((source) => <option key={source} value={source}>{source}</option>)}
+            </select>
+
+            <select className="dark-input" value={filters.signal} onChange={(event) => updateFilter('signal', event.target.value)}>
+              <option value="all">All Signals</option>
+              <option value="high">High Signal</option>
+              <option value="clustered">Multi-source</option>
+              <option value="single">Single-source</option>
+              <option value="fresh">Fresh</option>
+            </select>
+
+            <select className="dark-input" value={filters.image} onChange={(event) => updateFilter('image', event.target.value)}>
+              <option value="all">Any Image</option>
+              <option value="with">With Image</option>
+              <option value="without">No Image</option>
+            </select>
+
+            <select className="dark-input" value={filters.sort} onChange={(event) => updateFilter('sort', event.target.value)}>
+              <option value="date_desc">Newest First</option>
+              <option value="score_desc">Highest Score</option>
+              <option value="sources_desc">Most Sources</option>
+              <option value="title_asc">Title A-Z</option>
+            </select>
+          </div>
+        </section>
+      </form>
+
+      <section className="workflow-metric-row archive archive-search-metrics">
+        <div className="workflow-metric"><Icon name="layers" /><span>Loaded signals</span><strong>{loadedMetrics.total}</strong></div>
+        <div className="workflow-metric"><Icon name="filter" /><span>Visible now</span><strong>{visibleMetrics.total}</strong></div>
+        <div className="workflow-metric"><Icon name="trend" /><span>High signal</span><strong>{visibleMetrics.high}</strong></div>
+        <div className="workflow-metric"><Icon name="archive" /><span>Runs in range</span><strong>{runs.length}</strong></div>
+      </section>
+
+      {keywords.length > 0 && (
+        <section className="archive-keyword-ribbon">
+          <span>Top archive keywords</span>
+          <div>
+            {keywords.map((keyword) => (
+              <button
+                key={keyword}
+                className="source-chip"
+                onClick={() => updateFilter('text', keyword)}
                 type="button"
               >
-                <span>
-                  <span className="block text-xl font-semibold text-white">{day}</span>
-                  <span className="mt-1 block text-sm text-slate-400">{group.length} briefing run{group.length === 1 ? '' : 's'} available</span>
-                </span>
-                <Icon name={expandedDays[day] ? 'chevD' : 'chevR'} size={18} />
+                {keyword}
               </button>
-              {expandedDays[day] && (
-                <div className="archive-run-grid">
-                  {group.map((run) => {
-                    const summary = runMetrics[run.filename];
-                    return (
-                      <button
-                        key={run.filename}
-                        className="archive-run-card"
-                        onClick={() => openBriefing(run)}
-                        type="button"
-                      >
-                        <div className="archive-run-identity">
-                          <div className="text-xl font-semibold text-white">{run.time} Briefing</div>
-                          <span className="signal-chip">{run.type === 'scheduler' ? 'Scheduler' : 'Manual'}</span>
-                        </div>
-                        {summary && (
-                          <>
-                            <div className="archive-run-metrics">
-                              <div><div className="archive-stat-value">{summary.articles}</div><div className="archive-stat-label">Signals</div></div>
-                              <div><div className="archive-stat-value">{summary.clusters}</div><div className="archive-stat-label">Clusters</div></div>
-                              <div><div className="archive-stat-value">{summary.high}</div><div className="archive-stat-label">High Signal</div></div>
-                            </div>
-                            {summary.keywords.length > 0 && (
-                              <div className="archive-run-keywords">{summary.keywords.map((keyword) => <span className="source-chip" key={keyword}>{keyword}</span>)}</div>
-                            )}
-                          </>
-                        )}
-                        <div className="archive-open-action">
-                          Open Briefing <Icon name="chevR" size={14} />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
       )}
+
+      <ArchiveRunStrip runs={runs} activeRunLabel={activeRunLabel} onOpenRun={openRun} />
+
+      <section className="archive-results-panel">
+        <div className="archive-results-head">
+          <div>
+            <div className="eyebrow">Loaded Archive Results</div>
+            <h2>{activeRunLabel || `${from} to ${to}`}</h2>
+          </div>
+
+          <div className="archive-results-actions">
+            <button className="btn-dark-secondary" onClick={resetFilters} type="button">
+              Reset filters
+            </button>
+            <span>{filteredArticles.length} visible</span>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="workflow-empty archive">
+            <Icon name="refresh" size={25} />
+            <h2>Loading archive workspace</h2>
+          </div>
+        ) : err ? (
+          <div className="rounded-[24px] border border-red-300/20 bg-red-950/20 p-10 text-center">
+            <h2 className="text-xl font-semibold text-white">Failed to load archive</h2>
+            <p className="mt-2 text-red-200">{err}</p>
+          </div>
+        ) : !searched || !articles.length ? (
+          <div className="workflow-empty archive">
+            <Icon name="archive" size={27} />
+            <h2>No archive signals loaded for this range.</h2>
+            <p>Try a broader date range or open a retained run from the timeline.</p>
+          </div>
+        ) : !filteredArticles.length ? (
+          <div className="workflow-empty archive">
+            <Icon name="filter" size={27} />
+            <h2>No signals match the active filters.</h2>
+            <p>Reset filters or search a different keyword inside the loaded archive.</p>
+          </div>
+        ) : (
+          <div className="archive-result-groups space-y-8">
+            {Object.entries(articleGroups).map(([day, items]) => (
+              <div key={day} className="space-y-4">
+                <div className="workflow-day-head">
+                  <h2>{day}</h2>
+                  <span>{items.length} archived signal{items.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="article-grid grid gap-8 2xl:grid-cols-2">
+                  {items.map((item) => (
+                    <ArticleCard
+                      key={item.id}
+                      item={item}
+                      variant={cardVariant(item)}
+                      onOpen={setOpenArticle}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <ArticleModal
+        item={openArticle}
+        onClose={() => setOpenArticle(null)}
+        onCorrectRegion={onCorrectRegion}
+      />
     </div>
   );
 }
